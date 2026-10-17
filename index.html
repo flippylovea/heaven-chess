@@ -33,8 +33,11 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { min-height: 100%; }
+img { max-width: 100%; }
 body {
+  margin: 0;
   background: var(--sky-low);
   color: var(--ink);
   font-family: var(--font-body);
@@ -368,7 +371,7 @@ body {
 .moves li:nth-child(odd) { background: #eef3f8; }
 .moves .n { color: var(--ink-soft); }
 .moves .cur { background: #fff1c2; padding-inline: 4px; }
-.moves .empty { color: var(--ink-soft); font-size: 16px; padding: 4px; display: block; }
+.moves .empty { color: var(--ink-soft); font-size: 16px; padding: 4px; display: block; grid-column: 1 / -1; }
 
 .bestiary summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
 .bestiary summary::-webkit-details-marker { display: none; }
