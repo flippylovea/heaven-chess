@@ -1,0 +1,2228 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Райские шахматы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;600&display=swap">
+<style>
+/* Layout: a floating cloud island holding the board, a Minecraft-GUI side panel; blocky clouds drift behind
+   under a "shader pack" sky: sun bloom, god rays, white haze, lens flare. One deliberate light "heaven" theme. */
+:root {
+  color-scheme: light;
+  --sky-top: #a4d8f7;
+  --sky-mid: #d7effc;
+  --sky-low: #f8fcff;
+  --cloud: #ffffff;
+  --cloud-shade: #e6eef6;
+  --ink: #2c3a50;
+  --ink-soft: #5d6e88;
+  --line: #3e4d65;
+  --panel: rgba(250, 252, 255, .88);
+  --bevel-hi: #ffffff;
+  --bevel-lo: #c6d0dc;
+  --accent: #3aa7e0;
+  --accent-soft: #e2f3fd;
+  --gold: #f2c443;
+  --danger: #d9443f;
+  --ok: #3f9a4a;
+  --font-display: "Press Start 2P", "Courier New", monospace;
+  --font-body: "Pixelify Sans", "Trebuchet MS", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  background: var(--sky-low);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  overflow-x: hidden;
+}
+
+/* ---------- Sky (shader look) ---------- */
+.sky {
+  position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 36%, var(--sky-low) 68%, #ffffff 100%);
+}
+.sun {
+  position: absolute; top: 6%; right: 10%;
+  width: 96px; height: 96px; background: #fffbe6;
+  box-shadow:
+    0 0 0 16px rgba(255, 252, 232, .65),
+    0 0 0 38px rgba(255, 250, 228, .28),
+    0 0 180px 110px rgba(255, 249, 220, .8);
+}
+.sun::after { content: ""; position: absolute; inset: 20%; background: #fffff8; }
+.rays {
+  position: absolute; left: 50%; top: 50%;
+  width: 260vmax; height: 260vmax; margin: -130vmax 0 0 -130vmax;
+  z-index: -1;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 255, 255, .34) 0deg 3deg, rgba(255, 255, 255, 0) 3deg 11deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, .5) 14%, transparent 34%);
+  mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, .5) 14%, transparent 34%);
+  animation: spin 300s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.flare { position: absolute; border-radius: 50%; }
+.flare.f1 { right: 30%; top: 26%; width: 46px; height: 46px; background: radial-gradient(circle, rgba(255, 255, 255, .55), rgba(255, 255, 255, 0) 70%); }
+.flare.f2 { right: 44%; top: 40%; width: 18px; height: 18px; background: rgba(214, 240, 255, .55); }
+.flare.f3 { right: 58%; top: 56%; width: 110px; height: 110px; border: 2px solid rgba(255, 255, 255, .35); background: radial-gradient(circle, rgba(255, 255, 255, 0) 55%, rgba(220, 242, 255, .3)); }
+.haze {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 88% 8%, rgba(255, 253, 238, .75), rgba(255, 253, 238, 0) 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, .55) 85%, rgba(255, 255, 255, .85) 100%);
+}
+.cloud-layer { position: absolute; inset: 0; }
+.cloud {
+  position: absolute; left: 0;
+  animation: drift var(--dur, 120s) linear infinite;
+  animation-delay: var(--delay, 0s);
+  will-change: transform;
+}
+.cloud span { position: absolute; background: var(--cloud); }
+.cloud span.main {
+  background: linear-gradient(180deg, #ffffff 0%, #ffffff 55%, #eef4fa 100%);
+  box-shadow: 0 var(--side, 8px) 0 var(--cloud-shade), 0 0 34px 10px rgba(255, 255, 255, .75);
+}
+@keyframes drift {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100vw); }
+}
+.floor { position: absolute; left: 0; right: 0; bottom: 0; }
+.floor.back { height: 26vh; background: var(--cloud-shade); }
+.floor.front { height: 16vh; background: var(--cloud); box-shadow: 0 0 60px 30px rgba(255, 255, 255, .9); }
+.motes { position: absolute; inset: 0; }
+.motes i {
+  position: absolute; width: 4px; height: 4px; background: #fff;
+  box-shadow: 0 0 8px 3px rgba(255, 255, 255, .9);
+  animation: mote var(--d, 18s) linear infinite; animation-delay: var(--dl, 0s);
+  opacity: 0;
+}
+@keyframes mote {
+  0% { transform: translate(0, 0); opacity: 0; }
+  15% { opacity: .9; }
+  85% { opacity: .7; }
+  100% { transform: translate(var(--x, 30px), -38vh); opacity: 0; }
+}
+
+/* ---------- Page ---------- */
+.page {
+  position: relative; z-index: 1;
+  max-width: 1120px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 40px;
+  display: flex; flex-direction: column; gap: 22px;
+}
+.top { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(20px, 4.2vw, 40px);
+  line-height: 1.25;
+  letter-spacing: .02em;
+  color: #fff;
+  text-wrap: balance;
+  text-shadow:
+    .08em 0 0 var(--line), -.08em 0 0 var(--line), 0 .08em 0 var(--line), 0 -.08em 0 var(--line),
+    .08em .08em 0 var(--line), -.08em .08em 0 var(--line), .08em -.08em 0 var(--line), -.08em -.08em 0 var(--line),
+    0 .22em 0 rgba(62, 77, 101, .28), 0 0 .9em rgba(255, 255, 255, .95);
+}
+.title .gold { color: #fff3c4; }
+.sub { margin: 0; color: var(--ink-soft); font-size: 18px; max-width: 60ch; text-wrap: balance; }
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 28px;
+  align-items: start;
+}
+
+/* ---------- Board area ---------- */
+.board-area {
+  justify-self: center;
+  width: min(100%, 620px, max(300px, calc(100vh - 230px)));
+  display: flex; flex-direction: column; gap: 10px;
+}
+.island { position: relative; animation: hover 7s ease-in-out infinite; }
+@keyframes hover { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.frame {
+  position: relative;
+  padding: 10px;
+  background-image: var(--tex-snow);
+  background-color: #fff;
+  background-size: 40px 40px;
+  image-rendering: pixelated;
+  border: 3px solid var(--line);
+  box-shadow:
+    0 10px 0 -3px var(--cloud-shade), 0 10px 0 0 var(--line),
+    0 40px 70px -24px rgba(70, 120, 175, .38),
+    0 0 60px 8px rgba(255, 255, 255, .85);
+}
+.island-base { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: 10px; }
+.island-base i { display: block; height: 14px; background: var(--cloud); box-shadow: 0 6px 0 var(--cloud-shade), 0 0 30px 6px rgba(255, 255, 255, .8); }
+.island-base i:nth-child(1) { width: 86%; }
+.island-base i:nth-child(2) { width: 62%; }
+.island-base i:nth-child(3) { width: 30%; }
+
+.board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  aspect-ratio: 1 / 1;
+  width: 100%; max-width: 100%;
+  border: 3px solid var(--line);
+  user-select: none; -webkit-user-select: none;
+  touch-action: manipulation;
+}
+.board::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, .42) 0%, rgba(255, 255, 255, 0) 38%),
+    radial-gradient(ellipse at 85% 0%, rgba(255, 250, 225, .35), rgba(255, 250, 225, 0) 55%);
+}
+.sq {
+  position: relative; display: block;
+  border: 0; margin: 0; padding: 0;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  cursor: pointer; font: inherit; color: inherit;
+}
+.sq.light { background-color: #fbfdff; background-image: var(--tex-light); }
+.sq.dark { background-color: #c9e6f6; background-image: var(--tex-dark); }
+.sq:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; z-index: 3; }
+.sq::before { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.sq.last::before { background: rgba(255, 205, 80, .36); }
+.sq.picked::before { background: rgba(92, 186, 243, .42); box-shadow: inset 0 0 0 3px rgba(38, 138, 206, .75); }
+.sq.check::before {
+  background: radial-gradient(circle, rgba(231, 64, 64, .8) 0%, rgba(231, 64, 64, .35) 45%, transparent 72%);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: .55; } }
+.sq.hint::after {
+  content: ""; position: absolute; left: 39%; top: 39%; width: 22%; height: 22%;
+  background: rgba(45, 76, 118, .3); pointer-events: none;
+}
+.sq.hint.cap::after { left: 0; top: 0; width: 100%; height: 100%; background: transparent; box-shadow: inset 0 0 0 4px rgba(45, 76, 118, .38); }
+.coord {
+  position: absolute; font-family: var(--font-body); font-weight: 600;
+  font-size: clamp(9px, 1.7vw, 12px); line-height: 1; pointer-events: none;
+}
+.sq.light .coord { color: #86a9c6; }
+.sq.dark .coord { color: #f4fbff; }
+.coord.file { right: 4%; bottom: 4%; }
+.coord.rank { left: 5%; top: 5%; }
+
+.pieces { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.pc {
+  position: absolute; left: 0; top: 0; width: 12.5%; height: 12.5%;
+  transition: transform .24s cubic-bezier(.3, .7, .4, 1);
+}
+.pc img {
+  display: block; width: 100%; height: 100%; padding: 7%;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 4px 0 rgba(40, 68, 104, .16)) drop-shadow(0 0 5px rgba(255, 255, 255, .7));
+  transition: transform .2s, opacity .2s;
+}
+.pc.sel img { animation: bob .8s ease-in-out infinite alternate; }
+@keyframes bob { from { transform: translateY(0); } to { transform: translateY(-9%); } }
+.pc.gone img { transform: scale(.3); opacity: 0; }
+.puff { position: absolute; left: 0; top: 0; width: 12.5%; height: 12.5%; pointer-events: none; z-index: 6; }
+.puff i {
+  position: absolute; left: 44%; top: 44%; width: 12%; height: 12%;
+  background: #fff; box-shadow: 0 0 0 1px rgba(70, 100, 140, .3);
+  animation: puff .6s ease-out forwards;
+}
+@keyframes puff { to { transform: translate(var(--dx), var(--dy)) scale(.4); opacity: 0; } }
+
+/* Overlays (promotion / game over) */
+.overlay {
+  position: absolute; inset: 10px; z-index: 10;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, .6);
+  backdrop-filter: blur(2px);
+}
+.dialog {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding: 20px 22px; max-width: 86%;
+  text-align: center;
+}
+.dialog h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(14px, 2.6vw, 20px); line-height: 1.4; }
+.dialog p { margin: 0; color: var(--ink-soft); font-size: 18px; }
+.dialog .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.promo-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.promo-row button { width: 64px; height: 64px; padding: 6px; }
+.promo-row img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+
+/* Player tags */
+.tag {
+  display: flex; align-items: center; gap: 10px; min-height: 44px;
+  padding: 6px 10px;
+}
+.tag img.face { width: 34px; height: 34px; image-rendering: pixelated; flex: none; }
+.tag .who { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
+.tag .who b { font-weight: 600; font-size: 17px; overflow-wrap: anywhere; }
+.tag .who small { color: var(--ink-soft); font-size: 14px; }
+.tag .caps { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0; min-width: 0; }
+.tag .caps img { width: 22px; height: 22px; image-rendering: pixelated; margin-left: -4px; }
+.tag .adv { font-weight: 600; color: var(--ink-soft); margin-left: 6px; font-size: 15px; }
+.tag.turn { box-shadow: inset 4px 0 0 var(--accent), inset 3px 3px 0 var(--bevel-hi), inset -3px -3px 0 var(--bevel-lo); }
+
+/* ---------- Minecraft-GUI surfaces ---------- */
+.card, .tag, .dialog {
+  background: var(--panel);
+  backdrop-filter: blur(6px);
+  border: 3px solid var(--line);
+  box-shadow: inset 3px 3px 0 var(--bevel-hi), inset -3px -3px 0 var(--bevel-lo);
+}
+.panel { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.label { font-family: var(--font-display); font-size: 10px; letter-spacing: .08em; color: var(--ink-soft); text-transform: uppercase; line-height: 1.5; }
+
+.status-card { flex-direction: row; align-items: center; gap: 12px; }
+.status-card > img { width: 44px; height: 44px; image-rendering: pixelated; flex: none; }
+.status-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.status { font-size: 22px; font-weight: 600; line-height: 1.15; }
+.status.warn { color: var(--danger); }
+.status-meta { color: var(--ink-soft); font-size: 15px; }
+.dots::after { content: ""; animation: dots 1.2s steps(1) infinite; }
+@keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+
+.mc-btn {
+  font: inherit; font-weight: 600; font-size: 16px; color: var(--ink);
+  background: #fff;
+  border: 3px solid var(--line);
+  box-shadow: inset 3px 3px 0 var(--bevel-hi), inset -3px -4px 0 var(--bevel-lo);
+  padding: 9px 12px 11px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  text-align: center;
+}
+.mc-btn:hover:not(:disabled) { background: var(--accent-soft); border-color: #24618c; }
+.mc-btn:active:not(:disabled) { box-shadow: inset 3px 4px 0 var(--bevel-lo), inset -3px -3px 0 var(--bevel-hi); transform: translateY(1px); }
+.mc-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.mc-btn:disabled { color: #9aa6b6; cursor: not-allowed; background: #eef1f5; }
+.mc-btn.primary { background: #fffbe8; }
+.mc-btn.small { font-size: 14px; padding: 5px 9px 7px; }
+.mc-btn img { width: 22px; height: 22px; image-rendering: pixelated; }
+.mc-btn svg { width: 20px; height: 20px; image-rendering: pixelated; }
+.icon-btn { padding: 8px; flex: none; }
+.icon-btn[aria-pressed="false"] { color: #9aa6b6; }
+.btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn-grid .wide { grid-column: 1 / -1; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seg.three { grid-template-columns: repeat(3, 1fr); }
+.seg .mc-btn[aria-pressed="true"], .tabs .mc-btn[aria-selected="true"] {
+  background: var(--accent-soft); border-color: #24618c;
+  box-shadow: inset 3px 4px 0 #bcdcf0, inset -3px -3px 0 var(--bevel-hi);
+}
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* Online lobby */
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field label { font-size: 15px; color: var(--ink-soft); }
+.input-row { display: flex; gap: 8px; min-width: 0; }
+.input-row .mc-btn { flex: none; }
+.mc-input {
+  font: inherit; font-size: 17px; color: var(--ink);
+  background: #fff;
+  border: 3px solid var(--line);
+  box-shadow: inset 3px 3px 0 #e1e8f0;
+  padding: 8px 10px;
+  width: 100%; min-width: 0;
+}
+.mc-input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.mc-input.code { font-family: var(--font-display); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.note { margin: 0; color: var(--ink-soft); font-size: 15px; line-height: 1.35; }
+.note.err { color: var(--danger); }
+.note.ok { color: var(--ok); }
+.me-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.me-row img { width: 40px; height: 40px; image-rendering: pixelated; flex: none; }
+.me-row .who { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.15; }
+.me-row b { font-size: 19px; font-weight: 600; overflow-wrap: anywhere; }
+.pid { font-family: var(--font-display); font-size: 11px; letter-spacing: .06em; color: var(--ink-soft); }
+.sep { height: 3px; background: var(--bevel-lo); margin: 2px 0; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #fff; border: 2px solid var(--bevel-lo); min-width: 0; }
+.item .txt { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.15; }
+.item .txt b { font-weight: 600; overflow-wrap: anywhere; }
+.item .txt small { color: var(--ink-soft); font-size: 13px; }
+.badge { font-size: 13px; font-weight: 600; padding: 2px 6px; border: 2px solid currentColor; white-space: nowrap; }
+.badge.go { color: var(--ok); }
+.badge.wait { color: var(--ink-soft); }
+.badge.done { color: #8a97a8; }
+
+.moves {
+  list-style: none; margin: 0; padding: 0;
+  max-height: 210px; overflow-y: auto;
+  font-variant-numeric: tabular-nums;
+  display: flex; flex-direction: column;
+}
+.moves li { display: grid; grid-template-columns: 34px 1fr 1fr; gap: 4px; padding: 3px 4px; font-size: 17px; }
+.moves li:nth-child(odd) { background: #eef3f8; }
+.moves .n { color: var(--ink-soft); }
+.moves .cur { background: #fff1c2; padding-inline: 4px; }
+.moves .empty { color: var(--ink-soft); font-size: 16px; padding: 4px; display: block; }
+
+.bestiary summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+.bestiary summary::-webkit-details-marker { display: none; }
+.bestiary summary::after { content: "+"; font-family: var(--font-display); font-size: 12px; color: var(--ink-soft); }
+.bestiary[open] summary::after { content: "–"; }
+.bestiary summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.beasts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-top: 4px; }
+.beast { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 2px; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.beast:hover { background: var(--accent-soft); }
+.beast:focus-visible { outline: 3px solid var(--accent); }
+.beast img { width: 30px; height: 30px; image-rendering: pixelated; flex: none; }
+.beast span { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
+.beast b { font-weight: 600; font-size: 15px; }
+.beast small { color: var(--ink-soft); font-size: 13px; }
+.beasts h3 { grid-column: 1 / -1; margin: 6px 0 0; font-family: var(--font-display); font-weight: 400; font-size: 9px; letter-spacing: .08em; color: var(--ink-soft); text-transform: uppercase; }
+
+.foot { text-align: center; color: var(--ink-soft); font-size: 15px; margin: 0; }
+
+.toast {
+  position: fixed; z-index: 50; left: 50%; transform: translateX(-50%);
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: min(440px, calc(100% - 32px));
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  padding: 12px 14px; font-weight: 600;
+  background: var(--panel); backdrop-filter: blur(6px);
+  border: 3px solid var(--line);
+  box-shadow: inset 3px 3px 0 var(--bevel-hi), inset -3px -3px 0 var(--bevel-lo), 0 12px 30px rgba(60, 100, 150, .25);
+}
+.toast .row { display: flex; gap: 8px; }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .panel { width: min(100%, 620px); justify-self: center; }
+  .sun { width: 60px; height: 60px; right: 6%; }
+  .flare { display: none; }
+}
+@media (max-width: 420px) {
+  .page { padding-block: 18px 32px; gap: 16px; }
+  .frame { padding: 6px; }
+  .overlay { inset: 6px; }
+  .tag .caps img { width: 18px; height: 18px; }
+  .seg.three { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cloud, .island, .pc.sel img, .sq.check::before, .rays, .motes i { animation: none !important; }
+  .motes { display: none; }
+  .pc, .pc img { transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="sky" aria-hidden="true">
+  <div class="sun"><div class="rays"></div></div>
+  <div class="cloud-layer" id="cloudsFar"></div>
+  <div class="haze"></div>
+  <div class="floor back" id="floorBack"></div>
+  <div class="cloud-layer" id="cloudsNear"></div>
+  <div class="floor front" id="floorFront"></div>
+  <div class="motes" id="motes"></div>
+  <div class="flare f1"></div><div class="flare f2"></div><div class="flare f3"></div>
+</div>
+
+<div class="page">
+  <header class="top">
+    <h1 class="title">Райские <span class="gold">шахматы</span></h1>
+    <p class="sub">Партия на облачном острове: Небесное войско против Армии Края. Играйте с компьютером или позовите друга по ссылке.</p>
+  </header>
+
+  <main class="layout">
+    <section class="board-area" aria-label="Игровое поле">
+      <div class="tag" id="tagTop"></div>
+      <div class="island">
+        <div class="frame">
+          <div class="board" id="board" role="grid" aria-label="Шахматная доска"></div>
+          <div class="overlay" id="promo" hidden>
+            <div class="dialog">
+              <h2>Превращение</h2>
+              <p>Кем станет пешка?</p>
+              <div class="promo-row" id="promoRow"></div>
+            </div>
+          </div>
+          <div class="overlay" id="gameover" hidden>
+            <div class="dialog">
+              <img id="goImg" alt="" width="72" height="72" style="image-rendering:pixelated">
+              <h2 id="goTitle">Победа!</h2>
+              <p id="goText"></p>
+              <div class="row">
+                <button class="mc-btn primary" id="goAgain" type="button">Сыграть ещё</button>
+                <button class="mc-btn" id="goClose" type="button">Посмотреть доску</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="island-base" aria-hidden="true"><i></i><i></i><i></i></div>
+      </div>
+      <div class="tag" id="tagBottom"></div>
+    </section>
+
+    <aside class="panel">
+      <div class="card status-card">
+        <img id="statusImg" alt="">
+        <div class="status-text">
+          <div class="status" id="status" aria-live="polite">Ваш ход</div>
+          <div class="status-meta" id="statusMeta">Сложность: средняя · расчёт на 3 полухода</div>
+        </div>
+        <button class="mc-btn icon-btn" id="btnSound" type="button" aria-pressed="true" aria-label="Звук" title="Звук фигур">
+          <svg viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+            <rect x="0" y="4" width="2" height="4"/><rect x="2" y="3" width="1" height="6"/><rect x="3" y="2" width="1" height="8"/><rect x="4" y="1" width="1" height="10"/>
+            <g class="waves"><rect x="7" y="4" width="1" height="4"/><rect x="9" y="2" width="1" height="8"/><rect x="8" y="3" width="1" height="1"/><rect x="8" y="8" width="1" height="1"/><rect x="10" y="1" width="1" height="1"/><rect x="10" y="10" width="1" height="1"/></g>
+            <g class="mute" style="display:none"><rect x="7" y="4" width="1" height="1"/><rect x="8" y="5" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="10" y="7" width="1" height="1"/><rect x="10" y="4" width="1" height="1"/><rect x="9" y="5" width="1" height="1"/><rect x="8" y="6" width="1" height="1"/><rect x="7" y="7" width="1" height="1"/></g>
+          </svg>
+        </button>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Режим игры">
+        <button class="mc-btn" id="modeAI" type="button" role="tab" aria-selected="true">С компьютером</button>
+        <button class="mc-btn" id="modeOnline" type="button" role="tab" aria-selected="false">С другом</button>
+      </div>
+
+      <div class="card" id="aiCard">
+        <div class="label">Играть за</div>
+        <div class="seg">
+          <button class="mc-btn" id="sideW" type="button" aria-pressed="true"><img id="sideWImg" alt="">Небесных</button>
+          <button class="mc-btn" id="sideB" type="button" aria-pressed="false"><img id="sideBImg" alt="">Армию Края</button>
+        </div>
+        <div class="btn-grid">
+          <button class="mc-btn primary wide" id="btnNew" type="button">Новая игра</button>
+          <button class="mc-btn" id="btnUndo" type="button">Отменить ход</button>
+          <button class="mc-btn" id="btnFlip" type="button">Перевернуть</button>
+        </div>
+      </div>
+
+      <div class="card" id="onlineCard" hidden>
+        <div id="online"><p class="note">Подключаемся к облакам…</p></div>
+      </div>
+
+      <div class="card">
+        <div class="label">Ходы</div>
+        <ol class="moves" id="moves"></ol>
+      </div>
+
+      <details class="card bestiary">
+        <summary><span class="label">Кто есть кто</span></summary>
+        <div class="beasts" id="beasts"></div>
+      </details>
+    </aside>
+  </main>
+
+  <p class="foot">Нажмите на фигуру, затем на клетку. В «Кто есть кто» можно послушать голос каждой фигуры.</p>
+</div>
+
+<div class="toast" id="toast" hidden role="status">
+  <span id="toastText"></span>
+  <span class="row"><button class="mc-btn small primary" type="button" data-t="accept">Принять</button><button class="mc-btn small" type="button" data-t="decline">Нет</button></span>
+</div>
+
+<script>
+/*ENGINE-START*/
+const PIECE_VAL = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 0 };
+const KN = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+const KG = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+const DIAG = [[-1,-1],[-1,1],[1,-1],[1,1]];
+const ORTH = [[-1,0],[1,0],[0,-1],[0,1]];
+const QDIRS = DIAG.concat(ORTH);
+// Castling rights bitmask: 1=K, 2=Q, 4=k, 8=q. Moving from/to a square clears the matching rights.
+const CR = new Array(64).fill(15);
+CR[60] = 12; CR[63] = 14; CR[56] = 13; CR[4] = 3; CR[7] = 11; CR[0] = 7;
+const FILES = 'abcdefgh';
+const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+function colorOf(p) { return p ? (p < 'a' ? 'w' : 'b') : null; }
+function sqName(s) { return FILES[s & 7] + (8 - (s >> 3)); }
+function sqFromName(n) { return (8 - +n[1]) * 8 + FILES.indexOf(n[0]); }
+
+function parseFEN(fen) {
+  const [pos, turn, cas, ep, half, full] = fen.split(' ');
+  const board = new Array(64).fill(null);
+  let s = 0;
+  for (const ch of pos) {
+    if (ch === '/') continue;
+    if (ch >= '1' && ch <= '8') s += +ch; else board[s++] = ch;
+  }
+  let castle = 0;
+  if (cas.includes('K')) castle |= 1;
+  if (cas.includes('Q')) castle |= 2;
+  if (cas.includes('k')) castle |= 4;
+  if (cas.includes('q')) castle |= 8;
+  return { board, turn, castle, ep: ep === '-' ? -1 : sqFromName(ep), half: +half || 0, full: +full || 1 };
+}
+
+function isAttacked(b, sq, by) {
+  const r = sq >> 3, f = sq & 7;
+  const pr = by === 'w' ? r + 1 : r - 1, pawn = by === 'w' ? 'P' : 'p';
+  if (pr >= 0 && pr < 8) {
+    if (f > 0 && b[pr * 8 + f - 1] === pawn) return true;
+    if (f < 7 && b[pr * 8 + f + 1] === pawn) return true;
+  }
+  const n = by === 'w' ? 'N' : 'n', k = by === 'w' ? 'K' : 'k';
+  for (const [dr, df] of KN) {
+    const r2 = r + dr, f2 = f + df;
+    if (r2 >= 0 && r2 < 8 && f2 >= 0 && f2 < 8 && b[r2 * 8 + f2] === n) return true;
+  }
+  for (const [dr, df] of KG) {
+    const r2 = r + dr, f2 = f + df;
+    if (r2 >= 0 && r2 < 8 && f2 >= 0 && f2 < 8 && b[r2 * 8 + f2] === k) return true;
+  }
+  const bq = by === 'w' ? 'BQ' : 'bq', rq = by === 'w' ? 'RQ' : 'rq';
+  for (const [dr, df] of DIAG) {
+    let r2 = r + dr, f2 = f + df;
+    while (r2 >= 0 && r2 < 8 && f2 >= 0 && f2 < 8) {
+      const p = b[r2 * 8 + f2];
+      if (p) { if (p === bq[0] || p === bq[1]) return true; break; }
+      r2 += dr; f2 += df;
+    }
+  }
+  for (const [dr, df] of ORTH) {
+    let r2 = r + dr, f2 = f + df;
+    while (r2 >= 0 && r2 < 8 && f2 >= 0 && f2 < 8) {
+      const p = b[r2 * 8 + f2];
+      if (p) { if (p === rq[0] || p === rq[1]) return true; break; }
+      r2 += dr; f2 += df;
+    }
+  }
+  return false;
+}
+
+function addPawnMove(moves, from, to, p, cap, promoRank) {
+  if (promoRank) {
+    for (const pr of 'QRBN') moves.push({ from, to, piece: p, captured: cap, promo: p < 'a' ? pr : pr.toLowerCase() });
+  } else moves.push({ from, to, piece: p, captured: cap });
+}
+
+function genCastles(st, ks, moves) {
+  const b = st.board, c = st.castle;
+  if (st.turn === 'w') {
+    if (ks !== 60) return;
+    if ((c & 1) && b[63] === 'R' && !b[61] && !b[62] &&
+        !isAttacked(b, 60, 'b') && !isAttacked(b, 61, 'b') && !isAttacked(b, 62, 'b'))
+      moves.push({ from: 60, to: 62, piece: 'K', captured: null, flag: 'castleK' });
+    if ((c & 2) && b[56] === 'R' && !b[57] && !b[58] && !b[59] &&
+        !isAttacked(b, 60, 'b') && !isAttacked(b, 59, 'b') && !isAttacked(b, 58, 'b'))
+      moves.push({ from: 60, to: 58, piece: 'K', captured: null, flag: 'castleQ' });
+  } else {
+    if (ks !== 4) return;
+    if ((c & 4) && b[7] === 'r' && !b[5] && !b[6] &&
+        !isAttacked(b, 4, 'w') && !isAttacked(b, 5, 'w') && !isAttacked(b, 6, 'w'))
+      moves.push({ from: 4, to: 6, piece: 'k', captured: null, flag: 'castleK' });
+    if ((c & 8) && b[0] === 'r' && !b[1] && !b[2] && !b[3] &&
+        !isAttacked(b, 4, 'w') && !isAttacked(b, 3, 'w') && !isAttacked(b, 2, 'w'))
+      moves.push({ from: 4, to: 2, piece: 'k', captured: null, flag: 'castleQ' });
+  }
+}
+
+function genPseudo(st, capturesOnly) {
+  const b = st.board, us = st.turn, moves = [];
+  for (let s = 0; s < 64; s++) {
+    const p = b[s];
+    if (!p || colorOf(p) !== us) continue;
+    const r = s >> 3, f = s & 7, t = p.toUpperCase();
+    if (t === 'P') {
+      const dir = us === 'w' ? -1 : 1, startRank = us === 'w' ? 6 : 1, lastRank = us === 'w' ? 0 : 7;
+      const r1 = r + dir;
+      if (r1 < 0 || r1 > 7) continue;
+      if (!capturesOnly && !b[r1 * 8 + f]) {
+        addPawnMove(moves, s, r1 * 8 + f, p, null, r1 === lastRank);
+        const r2 = r + 2 * dir;
+        if (r === startRank && !b[r2 * 8 + f]) moves.push({ from: s, to: r2 * 8 + f, piece: p, captured: null, flag: 'double' });
+      }
+      for (const df of [-1, 1]) {
+        const f1 = f + df;
+        if (f1 < 0 || f1 > 7) continue;
+        const to = r1 * 8 + f1, q = b[to];
+        if (q && colorOf(q) !== us) addPawnMove(moves, s, to, p, q, r1 === lastRank);
+        else if (!q && to === st.ep) moves.push({ from: s, to, piece: p, captured: us === 'w' ? 'p' : 'P', flag: 'ep' });
+      }
+    } else if (t === 'N' || t === 'K') {
+      for (const [dr, df] of (t === 'N' ? KN : KG)) {
+        const r2 = r + dr, f2 = f + df;
+        if (r2 < 0 || r2 > 7 || f2 < 0 || f2 > 7) continue;
+        const to = r2 * 8 + f2, q = b[to];
+        if (!q) { if (!capturesOnly) moves.push({ from: s, to, piece: p, captured: null }); }
+        else if (colorOf(q) !== us) moves.push({ from: s, to, piece: p, captured: q });
+      }
+      if (t === 'K' && !capturesOnly) genCastles(st, s, moves);
+    } else {
+      const dirs = t === 'B' ? DIAG : t === 'R' ? ORTH : QDIRS;
+      for (const [dr, df] of dirs) {
+        let r2 = r + dr, f2 = f + df;
+        while (r2 >= 0 && r2 < 8 && f2 >= 0 && f2 < 8) {
+          const to = r2 * 8 + f2, q = b[to];
+          if (!q) { if (!capturesOnly) moves.push({ from: s, to, piece: p, captured: null }); }
+          else { if (colorOf(q) !== us) moves.push({ from: s, to, piece: p, captured: q }); break; }
+          r2 += dr; f2 += df;
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+function make(st, m) {
+  const b = st.board;
+  const undo = { castle: st.castle, ep: st.ep, half: st.half };
+  b[m.to] = m.promo || m.piece;
+  b[m.from] = null;
+  if (m.flag === 'ep') b[m.to + (st.turn === 'w' ? 8 : -8)] = null;
+  else if (m.flag === 'castleK') { b[m.to - 1] = b[m.to + 1]; b[m.to + 1] = null; }
+  else if (m.flag === 'castleQ') { b[m.to + 1] = b[m.to - 2]; b[m.to - 2] = null; }
+  st.castle &= CR[m.from] & CR[m.to];
+  st.ep = m.flag === 'double' ? (m.from + m.to) >> 1 : -1;
+  st.half = (m.piece === 'P' || m.piece === 'p' || m.captured) ? 0 : st.half + 1;
+  if (st.turn === 'b') st.full++;
+  st.turn = st.turn === 'w' ? 'b' : 'w';
+  return undo;
+}
+
+function unmake(st, m, undo) {
+  st.turn = st.turn === 'w' ? 'b' : 'w';
+  if (st.turn === 'b') st.full--;
+  const b = st.board;
+  b[m.from] = m.piece;
+  if (m.flag === 'ep') { b[m.to] = null; b[m.to + (st.turn === 'w' ? 8 : -8)] = m.captured; }
+  else {
+    b[m.to] = m.captured;
+    if (m.flag === 'castleK') { b[m.to + 1] = b[m.to - 1]; b[m.to - 1] = null; }
+    else if (m.flag === 'castleQ') { b[m.to - 2] = b[m.to + 1]; b[m.to + 1] = null; }
+  }
+  st.castle = undo.castle; st.ep = undo.ep; st.half = undo.half;
+}
+
+function inCheck(st, color) {
+  const k = st.board.indexOf(color === 'w' ? 'K' : 'k');
+  return k >= 0 && isAttacked(st.board, k, color === 'w' ? 'b' : 'w');
+}
+
+function legalMoves(st) {
+  const us = st.turn, res = [];
+  for (const m of genPseudo(st, false)) {
+    const u = make(st, m);
+    if (!inCheck(st, us)) res.push(m);
+    unmake(st, m, u);
+  }
+  return res;
+}
+
+function perft(st, depth) {
+  if (depth === 0) return 1;
+  const us = st.turn;
+  let n = 0;
+  for (const m of genPseudo(st, false)) {
+    const u = make(st, m);
+    if (!inCheck(st, us)) n += perft(st, depth - 1);
+    unmake(st, m, u);
+  }
+  return n;
+}
+
+// ----- Evaluation: material + piece-square tables (white's view, a8 first) -----
+const PST = {
+  P: [0,0,0,0,0,0,0,0, 50,50,50,50,50,50,50,50, 10,10,20,30,30,20,10,10, 5,5,10,25,25,10,5,5,
+      0,0,0,20,20,0,0,0, 5,-5,-10,0,0,-10,-5,5, 5,10,10,-20,-20,10,10,5, 0,0,0,0,0,0,0,0],
+  N: [-50,-40,-30,-30,-30,-30,-40,-50, -40,-20,0,0,0,0,-20,-40, -30,0,10,15,15,10,0,-30, -30,5,15,20,20,15,5,-30,
+      -30,0,15,20,20,15,0,-30, -30,5,10,15,15,10,5,-30, -40,-20,0,5,5,0,-20,-40, -50,-40,-30,-30,-30,-30,-40,-50],
+  B: [-20,-10,-10,-10,-10,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,10,10,5,0,-10, -10,5,5,10,10,5,5,-10,
+      -10,0,10,10,10,10,0,-10, -10,10,10,10,10,10,10,-10, -10,5,0,0,0,0,5,-10, -20,-10,-10,-10,-10,-10,-10,-20],
+  R: [0,0,0,0,0,0,0,0, 5,10,10,10,10,10,10,5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5,
+      -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, 0,0,0,5,5,0,0,0],
+  Q: [-20,-10,-10,-5,-5,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,5,5,5,0,-10, -5,0,5,5,5,5,0,-5,
+      0,0,5,5,5,5,0,-5, -10,5,5,5,5,5,0,-10, -10,0,5,0,0,0,0,-10, -20,-10,-10,-5,-5,-10,-10,-20],
+  K: [-30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30,
+      -20,-30,-30,-40,-40,-30,-30,-20, -10,-20,-20,-20,-20,-20,-20,-10, 20,20,0,0,0,0,20,20, 20,30,10,0,0,10,30,20],
+  KE: [-50,-40,-30,-20,-20,-30,-40,-50, -30,-20,-10,0,0,-10,-20,-30, -30,-10,20,30,30,20,-10,-30, -30,-10,30,40,40,30,-10,-30,
+       -30,-10,30,40,40,30,-10,-30, -30,-10,20,30,30,20,-10,-30, -30,-30,0,0,0,0,-30,-30, -50,-30,-30,-30,-30,-30,-30,-50]
+};
+
+function evaluate(st) {
+  const b = st.board;
+  let wMat = 0, bMat = 0, queens = 0, wB = 0, bB = 0;
+  for (let s = 0; s < 64; s++) {
+    const p = b[s];
+    if (!p) continue;
+    const t = p.toUpperCase();
+    if (t === 'Q') queens++;
+    if (t === 'B') { if (p < 'a') wB++; else bB++; }
+    if (t !== 'P' && t !== 'K') { if (p < 'a') wMat += PIECE_VAL[t]; else bMat += PIECE_VAL[t]; }
+  }
+  const endgame = queens === 0 || (wMat <= 1300 && bMat <= 1300);
+  let score = (wB >= 2 ? 30 : 0) - (bB >= 2 ? 30 : 0);
+  for (let s = 0; s < 64; s++) {
+    const p = b[s];
+    if (!p) continue;
+    const t = p.toUpperCase();
+    const tbl = t === 'K' ? (endgame ? PST.KE : PST.K) : PST[t];
+    if (p < 'a') score += PIECE_VAL[t] + tbl[s];
+    else score -= PIECE_VAL[t] + tbl[(7 - (s >> 3)) * 8 + (s & 7)];
+  }
+  return st.turn === 'w' ? score : -score;
+}
+
+// ----- Search: alpha-beta (negamax) + capture-only quiescence -----
+const MATE = 100000, INF = 1e9;
+function orderMoves(moves) {
+  for (const m of moves) {
+    let sc = 0;
+    if (m.captured) sc = 1000 + 10 * PIECE_VAL[m.captured.toUpperCase()] - PIECE_VAL[m.piece.toUpperCase()];
+    if (m.promo) sc += 800;
+    m._s = sc;
+  }
+  moves.sort((a, b) => b._s - a._s);
+}
+
+function quiesce(st, alpha, beta, qd) {
+  const stand = evaluate(st);
+  if (stand >= beta) return stand;
+  if (stand > alpha) alpha = stand;
+  if (qd >= 6) return stand;
+  const us = st.turn, moves = genPseudo(st, true);
+  orderMoves(moves);
+  for (const m of moves) {
+    const u = make(st, m);
+    if (inCheck(st, us)) { unmake(st, m, u); continue; }
+    const sc = -quiesce(st, -beta, -alpha, qd + 1);
+    unmake(st, m, u);
+    if (sc >= beta) return sc;
+    if (sc > alpha) alpha = sc;
+  }
+  return alpha;
+}
+
+function negamax(st, depth, alpha, beta, ply) {
+  if (depth === 0) return quiesce(st, alpha, beta, 0);
+  const us = st.turn, moves = genPseudo(st, false);
+  orderMoves(moves);
+  let best = -INF, legal = 0;
+  for (const m of moves) {
+    const u = make(st, m);
+    if (inCheck(st, us)) { unmake(st, m, u); continue; }
+    legal++;
+    const sc = -negamax(st, depth - 1, -beta, -alpha, ply + 1);
+    unmake(st, m, u);
+    if (sc > best) best = sc;
+    if (sc > alpha) alpha = sc;
+    if (alpha >= beta) break;
+  }
+  if (!legal) return inCheck(st, us) ? -MATE + ply : 0;
+  return best;
+}
+
+// Medium strength: 3-ply search, then a random pick among moves within `spread` centipawns of the best.
+function searchBest(st, depth, spread, rand) {
+  const moves = legalMoves(st);
+  if (!moves.length) return null;
+  orderMoves(moves);
+  let best = -INF;
+  const scored = [];
+  for (const m of moves) {
+    const u = make(st, m);
+    const floor = best === -INF ? -INF : best - spread - 1;
+    const sc = -negamax(st, depth - 1, -INF, -floor, 1);
+    unmake(st, m, u);
+    scored.push([m, sc]);
+    if (sc > best) best = sc;
+  }
+  if (best > MATE - 1000) return scored.find(x => x[1] === best)[0];
+  const pool = scored.filter(x => x[1] >= best - spread).map(x => x[0]);
+  return pool[Math.floor((rand || Math.random)() * pool.length)];
+}
+/*ENGINE-END*/
+</script>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // ---------- Pixel sprites (16×16, drawn to canvas with a 1px outline) ----------
+  const SPRITES = {
+    wP: { name: 'Овца', role: 'пешка', pal: { W: '#ffffff', w: '#e3e8ef', s: '#dcc6b2', e: '#ffffff', k: '#2a2a2a', p: '#eba9a9' }, rows: [
+      '................','................','................','................',
+      '...wWWWWWWWWw...','..wWWWWWWWWWWw..','..WWWssssssWWW..','..WWssssssssWW..',
+      '..WseksssskesW..','..WssssssssssW..','..WssssppssssW..','..wssssssssssw..',
+      '..wWWWWWWWWWWw..','..WWWWWWWWWWWW..','..wWWWWWWWWWWw..','...ss......ss...'] },
+    wN: { name: 'Белый конь', role: 'конь', pal: { W: '#ffffff', w: '#dfe5ec', m: '#aebdcc', k: '#26303c', n: '#8593a3', y: '#f3c846' }, rows: [
+      '................','.........ww.....','........wWWm....','.......WWWWmm...',
+      '......WWkWWWmm..','....WWWWWWWWmm..','..WWWWWWWWWWWmm.','..wWWWWWWWWWWmm.',
+      '..nwWWWyWWWWWmm.','...wwwyWWWWWWWm.','.......yWWWWWWm.','......wWWWWWWWm.',
+      '.....wWWWWWWWWm.','....yyyyyyyyyyy.','....wWWWWWWWWWw.','...wwwwwwwwwwwww'] },
+    wB: { name: 'Жрец', role: 'слон', pal: { y: '#f5c842', s: '#e2b68e', S: '#c99a70', n: '#b47c54', k: '#4a3220', e: '#ffffff', g: '#3da64e', W: '#ffffff', w: '#dfe4eb' }, rows: [
+      '.....yyyyyy.....','................','....ssssssss....','....kkkkkkkk....',
+      '....segnnges....','....sssnnsss....','....SssnnssS....','....SSsnnsSS....',
+      '....wWWnnWWw....','...wWWWWWWWWw...','...wWWWyyWWWw...','..wWWWWyyWWWWw..',
+      '..wWWyyyyyyWWw..','..wWWWWyyWWWWw..','..wWWWWyyWWWWw..','.wwwwwwwwwwwwww.'] },
+    wR: { name: 'Кварцевый маяк', role: 'ладья', pal: { W: '#ffffff', w: '#e4e8ed', q: '#cdd5de', c: '#7fe2ff', C: '#d2f7ff' }, rows: [
+      '......cCCc......','...WW.WWWW.WW...','...WW.WccW.WW...','...WWWWWWWWWW...',
+      '...wqqqqqqqqw...','....WWWWWWWW....','....WwWWWWwW....','....WWWccWWW....',
+      '....WWWccWWW....','....WwWWWWwW....','....WWWWWWWW....','....qqqqqqqq....',
+      '...WWWWWWWWWW...','...wWWWWWWWWw...','..WWWWWWWWWWWW..','..qqqqqqqqqqqq..'] },
+    wQ: { name: 'Дух-хранитель', role: 'ферзь', pal: { y: '#f6cc45', Y: '#e0a524', B: '#a6e8ff', b: '#6fcbf2', c: '#e2f8ff', k: '#1f3d5c', p: '#ff9fc6', W: '#ffffff', w: '#dbe6f0' }, rows: [
+      '....y..yy..y....','....yYyyyyYy....','....bBBBBBBb....','w...BBBBBBBB...w',
+      'Ww..BkkBBkkB..wW','WWw.BkkBBkkB.wWW','WWWwBpBBBBpBwWWW','.WWWbBBBBBBbWWW.',
+      '..WWwbbbbbbwWW..','...ww.cBBc.ww...','......BccB......','.....bBBBBb.....',
+      '.....BBccBB.....','....bBBBBBBb....','....yyyyyyyy....','...yYYYYYYYYy...'] },
+    wK: { name: 'Железный голем', role: 'король', pal: { y: '#f6cc45', Y: '#d9a21f', R: '#e8344e', I: '#ece6dd', i: '#d2c8bb', d: '#9f9484', r: '#b8322a', v: '#6fae3f' }, rows: [
+      '.......yy.......','......yyyy......','...y...yy...y...','...yYyyRRyyYy...',
+      '...yyyyyyyyyy...','....IIIIIIII....','....IddIIddI....','....IrdIIdrI....',
+      '....IIIiiIII....','....iIIiiIIi....','...IIIIiiIIII...','..IIvIIIIIIvII..',
+      '..IIvIIIIIIIII..','..IIIIIIIIIvII..','..iIIIIIIIIIIi..','.iiiiiiiiiiiiii.'] },
+    bP: { name: 'Крипер', role: 'пешка', pal: { G: '#5cc04b', g: '#3e9a34', h: '#8bd97a', K: '#151515', d: '#2e5d27' }, rows: [
+      '................','................','................','...GgGhGGgGhG...',
+      '...hGGgGGGgGG...','...GgKKGGKKgG...','...GGKKgGKKGG...','...hGGgKKGGgG...',
+      '...GGgKKKKGGh...','...GgGKKKKgGG...','...GGGKGGKGgG...','...gGhGGgGGGg...',
+      '.....gGGhGg.....','.....GgGGhG.....','....gGGhhGGg....','....dddddddd....'] },
+    bN: { name: 'Паук', role: 'конь', pal: { D: '#2d2723', d: '#3f3732', l: '#574d45', R: '#e3262c', r: '#a01217' }, rows: [
+      '................','................','................','....dDDDDDDd....',
+      '...dDDDDDDDDd...','...DRRDDDDRRD...','ll.DrRDDDDRrD.ll','.lllDDRDDRDDlll.',
+      'l..lDDDDDDDDl..l','l.l.dDDDDDDd.l.l','.l.l.dddddd.l.l.','l..l.dDDDDd.l..l',
+      '...l.dDDDDd.l...','..l..dDDDDd..l..','.....dddddd.....','................'] },
+    bB: { name: 'Эндермен', role: 'слон', pal: { K: '#141414', k: '#262626', P: '#d97cff', p: '#f0c2ff', m: '#8a35c4' }, rows: [
+      '................','....kKKKKKKk....','....KKKKKKKK....','....KKkKKkKK....',
+      '....KKKKKKKK....','....mPpKKpPm....','....KKKKKKKK....','....KkKKKKkK....',
+      '....kKKKKKKk....','......KKKK......','.....kKKKKk.....','....k.KKKK.k....',
+      '....k.KKKK.k....','....k.KkkK.k....','......K..K......','.....kK..Kk.....'] },
+    bR: { name: 'Обсидиановая башня', role: 'ладья', pal: { O: '#1d1430', o: '#2e2049', v: '#5b2e8e', V: '#a356e0' }, rows: [
+      '................','...OO.OOOO.OO...','...OO.OvVO.OO...','...OOOOOOOOOO...',
+      '...oooooooooo...','....OOvOOOOO....','....OOOOOvOO....','....OOOVVOOO....',
+      '....OvOVVOOO....','....OOOOOOvO....','....OOvOOOOO....','....oooooooo....',
+      '...OOOOOOOOOO...','...OOvOOOOvOO...','..OOOOOOOOOOOO..','..oooooooooooo..'] },
+    bQ: { name: 'Эндер-дракон', role: 'ферзь', pal: { K: '#16111c', k: '#2a2232', g: '#4a4256', P: '#e477ff', p: '#a92fd8', w: '#ececec' }, rows: [
+      '..g..........g..','..gg........gg..','...gKKKKKKKKg...','...KKKKKKKKKK...',
+      '...KPPKKKKPPK...','...KkpKKKKpkK...','...KKKKKKKKKK...','..kKKKKKKKKKKk..',
+      '..KKgKKKKKKgKK..','..KKKKKKKKKKKK..','..KwKwKwKwKwKK..','...kKKKKKKKKk...',
+      '....kKKKKKKk....','....pppppppp....','...pPPPPPPPPp...','................'] },
+    bK: { name: 'Иссушитель', role: 'король', pal: { y: '#f6cc45', R: '#e8344e', K: '#1c1c21', k: '#2e2e36', g: '#4a4a55', e: '#e6ecff' }, rows: [
+      '.......yy.......','......yyyy......','.....y.yy.y.....','.....yyRRyy.....',
+      '.....KKKKKK.....','.....KeKKeK.....','kkkk.KKKKKK.kkkk','kekk.KggggK.kkek',
+      'kkkk.KKKKKK.kkkk','kggk..KKKK..kggk','.KKKKKKKKKKKKKK.','......KggK......',
+      '....KKKKKKKK....','......KggK......','....kKKKKKKk....','...gggggggggg...'] }
+  };
+
+  function mulberry(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const hexRGB = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+  const clamp = v => Math.max(0, Math.min(255, Math.round(v)));
+
+  function drawSprite(def, outline, seed) {
+    const S = 18, cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const ctx = cv.getContext('2d'), img = ctx.createImageData(S, S), d = img.data;
+    const rnd = mulberry(seed), solid = new Uint8Array(S * S);
+    def.rows.forEach((row, y) => {
+      for (let x = 0; x < 16; x++) {
+        const hex = def.pal[row[x]];
+        if (!hex) continue;
+        const [r, g, b] = hexRGB(hex), j = 1 + (rnd() - 0.5) * 0.1, i = (y + 1) * S + (x + 1);
+        solid[i] = 1;
+        d[i * 4] = clamp(r * j); d[i * 4 + 1] = clamp(g * j); d[i * 4 + 2] = clamp(b * j); d[i * 4 + 3] = 255;
+      }
+    });
+    const [or, og, ob] = hexRGB(outline);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const i = y * S + x;
+      if (solid[i]) continue;
+      if ((x > 0 && solid[i - 1]) || (x < S - 1 && solid[i + 1]) || (y > 0 && solid[i - S]) || (y < S - 1 && solid[i + S])) {
+        d[i * 4] = or; d[i * 4 + 1] = og; d[i * 4 + 2] = ob; d[i * 4 + 3] = 235;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return cv.toDataURL();
+  }
+
+  function blockTexture(base, jitter, speckRate, speck, seed) {
+    const S = 16, cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const ctx = cv.getContext('2d'), img = ctx.createImageData(S, S), d = img.data, rnd = mulberry(seed);
+    const [br, bg, bb] = hexRGB(base), [sr, sg, sb] = hexRGB(speck);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      let [r, g, b] = rnd() < speckRate ? [sr, sg, sb] : [br, bg, bb];
+      let j = 1 + (rnd() - 0.5) * jitter;
+      if (x === S - 1 || y === S - 1) j *= 0.95;
+      if (x === 0 || y === 0) j *= 1.02;
+      const i = (y * S + x) * 4;
+      d[i] = clamp(r * j); d[i + 1] = clamp(g * j); d[i + 2] = clamp(b * j); d[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    return cv.toDataURL();
+  }
+
+  const IMG = {};
+  function buildArt() {
+    let seed = 7;
+    for (const k in SPRITES) IMG[k] = drawSprite(SPRITES[k], k[0] === 'w' ? '#4d5d74' : '#0e0b14', seed++);
+    const root = document.documentElement.style;
+    root.setProperty('--tex-light', `url(${blockTexture('#fdfeff', 0.03, 0.05, '#f0f5f9', 11)})`);
+    root.setProperty('--tex-dark', `url(${blockTexture('#c9e6f6', 0.055, 0.08, '#e8f7fe', 23)})`);
+    root.setProperty('--tex-snow', `url(${blockTexture('#ffffff', 0.03, 0.08, '#ecf2f8', 31)})`);
+  }
+
+  // ---------- Sky: clouds, cloud sea, light motes ----------
+  function buildSky() {
+    const rnd = mulberry(2026);
+    const layers = [
+      { el: $('cloudsFar'), n: 6, u: [9, 14], dur: [170, 240], top: [3, 45], op: 0.75 },
+      { el: $('cloudsNear'), n: 4, u: [18, 26], dur: [95, 140], top: [8, 62], op: 0.97 }
+    ];
+    for (const L of layers) {
+      for (let c = 0; c < L.n; c++) {
+        const u = Math.round(L.u[0] + rnd() * (L.u[1] - L.u[0]));
+        const w = 6 + Math.floor(rnd() * 7), h = 2;
+        const cloud = document.createElement('div');
+        cloud.className = 'cloud';
+        const dur = L.dur[0] + rnd() * (L.dur[1] - L.dur[0]);
+        cloud.style.cssText = `top:${L.top[0] + rnd() * (L.top[1] - L.top[0])}%;width:${w * u}px;height:${(h + 1) * u}px;` +
+          `opacity:${L.op};--dur:${dur}s;--delay:${-rnd() * dur}s;--side:${Math.round(u * 0.6)}px`;
+        const main = document.createElement('span');
+        main.className = 'main';
+        main.style.cssText = `left:0;top:${u}px;width:${w * u}px;height:${h * u}px`;
+        cloud.appendChild(main);
+        const bumps = 1 + Math.floor(rnd() * 2);
+        for (let b = 0; b < bumps; b++) {
+          const bx = 1 + Math.floor(rnd() * (w - 3)), bw = Math.min(2 + Math.floor(rnd() * 3), w - bx - 1);
+          const bump = document.createElement('span');
+          bump.style.cssText = `left:${bx * u}px;top:0;width:${bw * u}px;height:${u + 1}px`;
+          cloud.appendChild(bump);
+        }
+        L.el.appendChild(cloud);
+      }
+    }
+    const stepped = (el, n, lo, hi, seed) => {
+      const r = mulberry(seed), pts = ['0% 100%'];
+      for (let i = 0; i < n; i++) {
+        const y = Math.round((lo + r() * (hi - lo)) / 12.5) * 12.5;
+        pts.push(`${(i / n * 100).toFixed(2)}% ${y}%`, `${((i + 1) / n * 100).toFixed(2)}% ${y}%`);
+      }
+      pts.push('100% 100%');
+      el.style.clipPath = `polygon(${pts.join(',')})`;
+    };
+    stepped($('floorBack'), 14, 0, 55, 5);
+    stepped($('floorFront'), 18, 10, 60, 9);
+    const motes = $('motes');
+    for (let i = 0; i < 14; i++) {
+      const m = document.createElement('i');
+      m.style.cssText = `left:${rnd() * 100}%;top:${55 + rnd() * 45}%;--d:${16 + rnd() * 14}s;--dl:${-rnd() * 30}s;--x:${(rnd() - 0.5) * 120}px`;
+      motes.appendChild(m);
+    }
+  }
+
+  // ---------- Sound: soft synthesized mob voices (Web Audio, no files) ----------
+  const Sound = (function () {
+    let ctx = null, master = null, noiseBuf = null, muted = false;
+    try { muted = localStorage.getItem('heaven-chess-muted') === '1'; } catch (e) { /* storage unavailable */ }
+    function ensure() {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        ctx = new AC();
+        master = ctx.createGain();
+        master.gain.value = 0.2;
+        const comp = ctx.createDynamicsCompressor();
+        master.connect(comp); comp.connect(ctx.destination);
+        noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+        const ch = noiseBuf.getChannelData(0);
+        for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+      }
+      if (ctx.state === 'suspended') ctx.resume();
+      return ctx;
+    }
+    function env(g, t, vol, attack, dur) {
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    }
+    function chain(src, o, t) {
+      let node = src;
+      if (o.filter) {
+        const f = ctx.createBiquadFilter();
+        f.type = o.filter[0]; f.frequency.value = o.filter[1]; f.Q.value = o.filter[2] || 1;
+        node.connect(f); node = f;
+      }
+      const g = ctx.createGain();
+      env(g, t, o.vol || 0.2, o.attack || 0.01, o.dur);
+      node.connect(g);
+      if (o.am) {
+        const amg = ctx.createGain(), l = ctx.createOscillator(), lg = ctx.createGain();
+        amg.gain.value = 0.5; l.frequency.value = o.am; lg.gain.value = 0.5;
+        l.connect(lg); lg.connect(amg.gain); l.start(t); l.stop(t + o.dur + 0.05);
+        g.connect(amg); amg.connect(master);
+      } else g.connect(master);
+    }
+    function tone(o) {
+      const t = ctx.currentTime + (o.at || 0), osc = ctx.createOscillator();
+      osc.type = o.type || 'sine';
+      osc.frequency.setValueAtTime(o.f0, t);
+      if (o.f1) osc.frequency.exponentialRampToValueAtTime(o.f1, t + o.dur);
+      if (o.vib) {
+        const l = ctx.createOscillator(), lg = ctx.createGain();
+        l.frequency.value = o.vib[0]; lg.gain.value = o.vib[1];
+        l.connect(lg); lg.connect(osc.frequency); l.start(t); l.stop(t + o.dur + 0.05);
+      }
+      chain(osc, o, t);
+      osc.start(t); osc.stop(t + o.dur + 0.05);
+    }
+    function noise(o) {
+      const t = ctx.currentTime + (o.at || 0), src = ctx.createBufferSource();
+      src.buffer = noiseBuf; src.loop = true;
+      chain(src, o, t);
+      src.start(t, Math.random() * 0.5); src.stop(t + o.dur + 0.05);
+    }
+    const V = {
+      // Sheep: a short nasal "baa" with vibrato
+      wP() {
+        tone({ type: 'sawtooth', f0: 430, f1: 360, dur: 0.5, vol: 0.2, attack: 0.05, vib: [9, 20], filter: ['bandpass', 1300, 1.3] });
+        tone({ type: 'sawtooth', f0: 860, f1: 720, dur: 0.45, vol: 0.05, attack: 0.05, vib: [9, 30], filter: ['bandpass', 2400, 2] });
+      },
+      // Horse: two hoof clops and a little whinny
+      wN() {
+        noise({ dur: 0.06, vol: 0.5, attack: 0.003, filter: ['bandpass', 900, 5] });
+        noise({ at: 0.13, dur: 0.06, vol: 0.45, attack: 0.003, filter: ['bandpass', 1150, 5] });
+        tone({ at: 0.05, type: 'sawtooth', f0: 950, f1: 620, dur: 0.38, vol: 0.05, attack: 0.03, vib: [15, 70], filter: ['bandpass', 1500, 2] });
+      },
+      // Cleric villager: grumpy "hrmm"
+      wB() {
+        tone({ type: 'square', f0: 170, f1: 235, dur: 0.17, vol: 0.12, attack: 0.03, vib: [26, 6], filter: ['lowpass', 850] });
+        tone({ at: 0.15, type: 'square', f0: 235, f1: 150, dur: 0.24, vol: 0.12, attack: 0.02, vib: [26, 6], filter: ['lowpass', 800] });
+      },
+      // Quartz beacon: soft glassy chime
+      wR() {
+        noise({ dur: 0.05, vol: 0.25, attack: 0.003, filter: ['lowpass', 700] });
+        tone({ f0: 523, dur: 0.7, vol: 0.1, attack: 0.01, vib: [6, 3] });
+        tone({ at: 0.06, f0: 784, dur: 0.6, vol: 0.07, attack: 0.01, vib: [6, 4] });
+        tone({ at: 0.12, f0: 1046, dur: 0.5, vol: 0.05, attack: 0.01 });
+      },
+      // Guardian spirit: rising sparkly chirps
+      wQ() {
+        tone({ type: 'triangle', f0: 1320, f1: 1760, dur: 0.13, vol: 0.1, attack: 0.01 });
+        tone({ at: 0.09, type: 'triangle', f0: 1568, f1: 2093, dur: 0.13, vol: 0.09, attack: 0.01 });
+        tone({ at: 0.18, type: 'triangle', f0: 1760, f1: 2637, dur: 0.2, vol: 0.08, attack: 0.01 });
+      },
+      // Iron golem: heavy thud with a metallic ring
+      wK() {
+        tone({ f0: 120, f1: 45, dur: 0.38, vol: 0.55, attack: 0.005 });
+        noise({ dur: 0.14, vol: 0.35, attack: 0.003, filter: ['lowpass', 420] });
+        for (const [f, v] of [[347, 0.06], [563, 0.05], [887, 0.04], [1211, 0.03]]) tone({ f0: f, dur: 0.55, vol: v, attack: 0.002 });
+      },
+      // Creeper: a short fuse hiss
+      bP() { noise({ dur: 0.45, vol: 0.12, attack: 0.2, filter: ['highpass', 3500] }); },
+      // Spider: chittering hiss
+      bN() {
+        noise({ dur: 0.35, vol: 0.25, attack: 0.02, filter: ['bandpass', 2300, 3], am: 28 });
+        tone({ type: 'sawtooth', f0: 320, f1: 200, dur: 0.2, vol: 0.03, attack: 0.01, filter: ['lowpass', 900] });
+      },
+      // Enderman: teleport "vwoop"
+      bB() {
+        tone({ f0: 1400, f1: 180, dur: 0.42, vol: 0.16, attack: 0.01, vib: [30, 90] });
+        tone({ at: 0.05, type: 'triangle', f0: 200, f1: 1200, dur: 0.3, vol: 0.05, attack: 0.02 });
+      },
+      // Obsidian tower: heavy stone placed
+      bR() {
+        noise({ dur: 0.13, vol: 0.6, attack: 0.003, filter: ['bandpass', 350, 1.5] });
+        tone({ f0: 150, f1: 80, dur: 0.13, vol: 0.25, attack: 0.003 });
+      },
+      // Ender dragon: low growl
+      bQ() {
+        tone({ type: 'sawtooth', f0: 98, f1: 70, dur: 0.7, vol: 0.22, attack: 0.06, vib: [11, 12], filter: ['lowpass', 600] });
+        noise({ dur: 0.6, vol: 0.12, attack: 0.1, filter: ['lowpass', 800], am: 9 });
+      },
+      // Wither: eerie detuned drone
+      bK() {
+        tone({ type: 'sawtooth', f0: 110, dur: 0.8, vol: 0.09, attack: 0.08, vib: [5, 3], filter: ['lowpass', 900] });
+        tone({ type: 'sawtooth', f0: 117, dur: 0.8, vol: 0.09, attack: 0.08, vib: [5, 3], filter: ['lowpass', 900] });
+        tone({ type: 'sawtooth', f0: 55, dur: 0.8, vol: 0.1, attack: 0.08, filter: ['lowpass', 500] });
+        noise({ dur: 0.7, vol: 0.07, attack: 0.25, filter: ['bandpass', 600, 0.7] });
+      },
+      capture() { tone({ at: 0.08, f0: 700, f1: 1400, dur: 0.09, vol: 0.13, attack: 0.005 }); },
+      check() {
+        tone({ at: 0.1, type: 'triangle', f0: 880, dur: 0.16, vol: 0.09 });
+        tone({ at: 0.22, type: 'triangle', f0: 1175, dur: 0.2, vol: 0.09 });
+      },
+      win() { [523, 659, 784, 1046].forEach((f, i) => tone({ at: i * 0.1, type: 'triangle', f0: f, dur: 0.32, vol: 0.12 })); },
+      lose() { [392, 330, 262].forEach((f, i) => tone({ at: i * 0.18, type: 'sine', f0: f, dur: 0.4, vol: 0.12 })); },
+      notify() { tone({ type: 'triangle', f0: 988, dur: 0.12, vol: 0.08 }); tone({ at: 0.1, type: 'triangle', f0: 1319, dur: 0.18, vol: 0.08 }); }
+    };
+    return {
+      unlock() { if (!muted) ensure(); },
+      play(name) {
+        if (muted || !V[name]) return;
+        if (!ensure()) return;
+        try { V[name](); } catch (e) { /* audio unavailable */ }
+      },
+      get muted() { return muted; },
+      toggle() {
+        muted = !muted;
+        try { localStorage.setItem('heaven-chess-muted', muted ? '1' : '0'); } catch (e) { /* storage unavailable */ }
+        return muted;
+      }
+    };
+  })();
+
+  // ---------- Game state ----------
+  const RU = { N: 'К', B: 'С', R: 'Л', Q: 'Ф', K: 'Кр' };
+  const SIDE = { w: 'Небесное войско', b: 'Армия Края' };
+  let mode = 'ai';
+  let st, history = [], startKey = '', legal = [], over = null;
+  let playerColor = 'w', flipped = false, selected = -1, selMoves = [], aiBusy = false, epoch = 0, pendingPromo = null;
+  const boardEl = $('board'), squares = [];
+  let piecesLayer, pieceEls = new Map();
+
+  const pkey = p => (p < 'a' ? 'w' : 'b') + p.toUpperCase();
+  const disp = s => flipped ? 63 - s : s;
+  const posKey = s => s.board.map(p => p || '.').join('') + s.turn + s.castle + s.ep;
+  const uci = m => sqName(m.from) + sqName(m.to) + (m.promo ? m.promo.toLowerCase() : '');
+  const opp = c => c === 'w' ? 'b' : 'w';
+
+  function toSAN(m, moves) {
+    if (m.flag === 'castleK') return 'O-O';
+    if (m.flag === 'castleQ') return 'O-O-O';
+    const t = m.piece.toUpperCase();
+    if (t === 'P') {
+      let s = m.captured ? FILES[m.from & 7] + '×' : '';
+      s += sqName(m.to);
+      if (m.promo) s += '=' + RU[m.promo.toUpperCase()];
+      return s;
+    }
+    let s = RU[t];
+    const others = moves.filter(o => o.piece === m.piece && o.to === m.to && o.from !== m.from);
+    if (others.length) {
+      const sameFile = others.some(o => (o.from & 7) === (m.from & 7));
+      const sameRank = others.some(o => (o.from >> 3) === (m.from >> 3));
+      s += !sameFile ? FILES[m.from & 7] : !sameRank ? String(8 - (m.from >> 3)) : sqName(m.from);
+    }
+    return s + (m.captured ? '×' : '') + sqName(m.to);
+  }
+
+  function insufficient(b) {
+    const rest = b.filter(p => p && p.toUpperCase() !== 'K');
+    return rest.length === 0 || (rest.length === 1 && 'NBnb'.includes(rest[0]));
+  }
+
+  function detectEnd() {
+    if (!legal.length) return inCheck(st, st.turn) ? { type: 'mate', winner: opp(st.turn) } : { type: 'stalemate' };
+    if (st.half >= 100) return { type: 'fifty' };
+    if (insufficient(st.board)) return { type: 'material' };
+    const k = posKey(st);
+    const reps = (startKey === k ? 1 : 0) + history.filter(h => h.key === k).length;
+    if (reps >= 3) return { type: 'repeat' };
+    return null;
+  }
+
+  // Applies a move to the game record without touching the DOM.
+  function commit(m) {
+    let san = toSAN(m, legal);
+    const u = make(st, m);
+    legal = legalMoves(st);
+    if (inCheck(st, st.turn)) san += legal.length ? '+' : '#';
+    history.push({ m, u, san, key: posKey(st) });
+    over = detectEnd();
+  }
+
+  function freshPosition() {
+    st = parseFEN(START_FEN);
+    history = [];
+    startKey = posKey(st);
+    legal = legalMoves(st);
+    over = null;
+  }
+
+  // ---------- Rendering ----------
+  function buildBoard() {
+    for (let i = 0; i < 64; i++) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sq ' + (((i >> 3) + (i & 7)) % 2 ? 'dark' : 'light');
+      b.dataset.i = i;
+      b.setAttribute('role', 'gridcell');
+      b.addEventListener('click', () => { Sound.unlock(); onSquare(flipped ? 63 - i : i); });
+      boardEl.appendChild(b);
+      squares.push(b);
+    }
+    piecesLayer = document.createElement('div');
+    piecesLayer.className = 'pieces';
+    boardEl.appendChild(piecesLayer);
+  }
+
+  function place(el, s) {
+    const d = disp(s);
+    el.style.transform = `translate(${(d & 7) * 100}%, ${(d >> 3) * 100}%)`;
+  }
+
+  function renderPieces() {
+    piecesLayer.innerHTML = '';
+    pieceEls = new Map();
+    for (let s = 0; s < 64; s++) {
+      const p = st.board[s];
+      if (p) pieceEls.set(s, addPiece(p, s));
+    }
+  }
+  function addPiece(p, s) {
+    const el = document.createElement('div');
+    el.className = 'pc';
+    const img = document.createElement('img');
+    img.src = IMG[pkey(p)];
+    img.alt = '';
+    img.draggable = false;
+    el.appendChild(img);
+    place(el, s);
+    piecesLayer.appendChild(el);
+    return el;
+  }
+
+  function paintSquares() {
+    const last = history.length ? history[history.length - 1].m : null;
+    const checkSq = inCheck(st, st.turn) ? st.board.indexOf(st.turn === 'w' ? 'K' : 'k') : -1;
+    const targets = new Map(selMoves.map(m => [m.to, m]));
+    for (let i = 0; i < 64; i++) {
+      const s = flipped ? 63 - i : i, el = squares[i], p = st.board[s];
+      el.classList.toggle('last', !!last && (last.from === s || last.to === s));
+      el.classList.toggle('picked', s === selected);
+      el.classList.toggle('check', s === checkSq);
+      el.classList.toggle('hint', targets.has(s));
+      el.classList.toggle('cap', targets.has(s) && !!targets.get(s).captured);
+      let coords = '';
+      if ((i >> 3) === 7) coords += `<span class="coord file">${FILES[s & 7]}</span>`;
+      if ((i & 7) === 0) coords += `<span class="coord rank">${8 - (s >> 3)}</span>`;
+      if (el.innerHTML !== coords) el.innerHTML = coords;
+      const sp = p ? SPRITES[pkey(p)] : null;
+      el.setAttribute('aria-label', sqName(s) + (sp ? `, ${sp.name} (${sp.role}, ${p < 'a' ? 'белые' : 'чёрные'})` : ''));
+    }
+    pieceEls.forEach((el, s) => el.classList.toggle('sel', s === selected));
+  }
+
+  function puff(s) {
+    const el = document.createElement('div');
+    el.className = 'puff';
+    place(el, s);
+    for (let k = 0; k < 9; k++) {
+      const i = document.createElement('i'), a = (k / 9) * Math.PI * 2 + Math.random() * 0.5, r = 220 + Math.random() * 180;
+      i.style.setProperty('--dx', `${Math.cos(a) * r}%`);
+      i.style.setProperty('--dy', `${Math.sin(a) * r - 60}%`);
+      el.appendChild(i);
+    }
+    piecesLayer.appendChild(el);
+    setTimeout(() => el.remove(), 700);
+  }
+
+  function animateMove(m) {
+    const capSq = m.flag === 'ep' ? m.to + (colorOf(m.piece) === 'w' ? 8 : -8) : m.to;
+    if (m.captured) {
+      const ce = pieceEls.get(capSq);
+      if (ce) { pieceEls.delete(capSq); ce.classList.add('gone'); setTimeout(() => ce.remove(), 240); }
+      puff(capSq);
+    }
+    const move = (from, to) => {
+      const el = pieceEls.get(from);
+      if (!el) return null;
+      pieceEls.delete(from);
+      pieceEls.set(to, el);
+      el.style.zIndex = 5;
+      place(el, to);
+      setTimeout(() => { el.style.zIndex = ''; }, 260);
+      return el;
+    };
+    const el = move(m.from, m.to);
+    if (el && m.promo) setTimeout(() => { el.querySelector('img').src = IMG[pkey(m.promo)]; }, 200);
+    if (m.flag === 'castleK') move(m.to + 1, m.to - 1);
+    if (m.flag === 'castleQ') move(m.to - 2, m.to + 1);
+    Sound.play(pkey(m.piece));
+    if (m.captured) Sound.play('capture');
+    if (inCheck(st, st.turn) && !over) Sound.play('check');
+  }
+
+  function capturedBy(color) {
+    const init = { P: 8, N: 2, B: 2, R: 2, Q: 1 }, have = { P: 0, N: 0, B: 0, R: 0, Q: 0 };
+    const o = opp(color);
+    for (const p of st.board) if (p && colorOf(p) === o && p.toUpperCase() !== 'K') have[p.toUpperCase()]++;
+    const out = [];
+    for (const t of 'QRBNP') for (let k = have[t]; k < init[t]; k++) out.push(o + t);
+    return out;
+  }
+  function material(color) {
+    let v = 0;
+    for (const p of st.board) if (p && colorOf(p) === color) v += PIECE_VAL[p.toUpperCase()];
+    return v;
+  }
+
+  function seatInfo(color) {
+    if (mode === 'ai') {
+      const isPlayer = color === playerColor;
+      return { title: SIDE[color], sub: isPlayer ? 'Вы' : (aiBusy ? '<span class="dots">Думает</span>' : 'Компьютер') };
+    }
+    const g = net.game, uid = g ? (color === 'w' ? g.white : g.black) : null;
+    if (!uid) return { title: SIDE[color], sub: g ? '<span class="dots">Ждём соперника</span>' : 'Свободное место' };
+    const pl = net.players.get(uid);
+    const nick = pl ? esc(pl.nick) : 'Игрок';
+    return { title: nick, sub: (uid === net.me ? 'Вы · ' : '') + SIDE[color] + (pl ? ` · #${esc(pl.code)}` : '') };
+  }
+
+  function renderTag(el, color) {
+    const info = seatInfo(color);
+    const caps = capturedBy(color).map(k => `<img src="${IMG[k]}" alt="${SPRITES[k].name}">`).join('');
+    const diff = Math.round((material(color) - material(opp(color))) / 100);
+    el.innerHTML = `<img class="face" src="${IMG[color + 'K']}" alt="">` +
+      `<span class="who"><b>${info.title}</b><small>${info.sub}</small></span>` +
+      `<span class="caps">${caps}${diff > 0 ? `<span class="adv">+${diff}</span>` : ''}</span>`;
+    const live = mode === 'ai' || (net.game && net.game.status === 'active');
+    el.classList.toggle('turn', !over && live && st.turn === color);
+  }
+
+  function statusText() {
+    if (over) return { text: endText(over).title };
+    if (mode === 'ai') {
+      if (aiBusy) return { text: '<span class="dots">Армия Края думает</span>' };
+      if (st.turn === playerColor) {
+        const chk = inCheck(st, st.turn);
+        return { text: chk ? 'Шах! Ваш ход' : 'Ваш ход', warn: chk };
+      }
+      return { text: 'Ход компьютера' };
+    }
+    const g = net.game;
+    if (!g) return { text: 'Партия с другом' };
+    if (g.status === 'waiting') return { text: '<span class="dots">Ждём соперника</span>' };
+    if (!playerColor) return { text: st.turn === 'w' ? 'Ходят белые' : 'Ходят чёрные' };
+    if (st.turn === playerColor) {
+      const chk = inCheck(st, st.turn);
+      return { text: chk ? 'Шах! Ваш ход' : 'Ваш ход', warn: chk };
+    }
+    return { text: 'Ход соперника' };
+  }
+
+  function renderSide() {
+    const topColor = flipped ? 'w' : 'b';
+    renderTag($('tagTop'), topColor);
+    renderTag($('tagBottom'), opp(topColor));
+
+    const s = statusText(), status = $('status');
+    status.innerHTML = s.text;
+    status.classList.toggle('warn', !!s.warn);
+    $('statusImg').src = IMG[st.turn + 'K'];
+    $('statusMeta').textContent = mode === 'ai'
+      ? 'Сложность: средняя · расчёт на 3 полухода'
+      : (net.game ? (playerColor ? `Вы играете за ${playerColor === 'w' ? 'белых' : 'чёрных'}` : 'Вы смотрите партию') : 'Позовите друга по ссылке');
+
+    const ol = $('moves');
+    if (!history.length) {
+      ol.innerHTML = '<li><span class="empty">Партия ещё не началась</span></li>';
+    } else {
+      let html = '';
+      for (let i = 0; i < history.length; i += 2) {
+        const cur = j => (j === history.length - 1 ? ' class="cur"' : '');
+        html += `<li><span class="n">${i / 2 + 1}.</span><span${cur(i)}>${history[i].san}</span>` +
+          `<span${cur(i + 1)}>${history[i + 1] ? history[i + 1].san : ''}</span></li>`;
+      }
+      ol.innerHTML = html;
+      ol.scrollTop = ol.scrollHeight;
+    }
+
+    $('btnUndo').disabled = !history.some(h => colorOf(h.m.piece) === playerColor);
+    $('sideW').setAttribute('aria-pressed', String(playerColor === 'w'));
+    $('sideB').setAttribute('aria-pressed', String(playerColor === 'b'));
+    $('modeAI').setAttribute('aria-selected', String(mode === 'ai'));
+    $('modeOnline').setAttribute('aria-selected', String(mode === 'online'));
+    $('aiCard').hidden = mode !== 'ai';
+    $('onlineCard').hidden = mode !== 'online';
+  }
+
+  function endText(o) {
+    const colorName = c => c === 'w' ? 'Небесное войско' : 'Армия Края';
+    if (o.type === 'mate' || o.type === 'resign') {
+      const how = o.type === 'mate' ? 'Мат.' : (o.winner === playerColor ? 'Соперник сдался.' : (playerColor ? 'Вы сдались.' : 'Одна из сторон сдалась.'));
+      if (!playerColor) return { title: `Победа: ${colorName(o.winner)}`, text: how, img: o.winner + 'K', good: true };
+      return o.winner === playerColor
+        ? { title: 'Победа!', text: how + ' Небеса ликуют.', img: playerColor + 'K', good: true }
+        : { title: 'Поражение', text: how + ' На этот раз сильнее оказалась ' + (o.winner === 'b' ? 'Армия Края.' : 'Небесное войско.'), img: o.winner + 'K', good: false };
+    }
+    const reasons = { stalemate: 'Пат: ходить некуда, но шаха нет.', fifty: 'Правило 50 ходов: 50 ходов без взятий и ходов пешками.', material: 'Ни у кого не хватает фигур, чтобы поставить мат.', repeat: 'Одна и та же позиция повторилась трижды.' };
+    return { title: 'Ничья', text: reasons[o.type] || '', img: 'wQ', good: true };
+  }
+
+  function showGameOver(withSound) {
+    const t = endText(over);
+    $('goTitle').textContent = t.title;
+    $('goText').textContent = t.text;
+    $('goImg').src = IMG[t.img];
+    const again = $('goAgain');
+    if (mode === 'ai') { again.hidden = false; again.textContent = 'Сыграть ещё'; }
+    else { again.hidden = !playerColor || !opponentId(); again.textContent = 'Реванш'; }
+    $('gameover').hidden = false;
+    if (withSound) Sound.play(t.good ? 'win' : 'lose');
+  }
+
+  function renderAll() {
+    renderPieces();
+    paintSquares();
+    renderSide();
+  }
+
+  // ---------- Flow ----------
+  function doMove(m) {
+    commit(m);
+    selected = -1; selMoves = [];
+    animateMove(m);
+    paintSquares();
+    renderSide();
+    if (mode === 'ai') save(); else pushOnline();
+    if (over) setTimeout(() => showGameOver(true), 500);
+    else maybeAI();
+  }
+
+  function maybeAI() {
+    if (mode !== 'ai' || over || st.turn === playerColor) return;
+    aiBusy = true;
+    renderSide();
+    const my = epoch;
+    setTimeout(() => {
+      if (my !== epoch) return;
+      const t0 = performance.now();
+      const m = searchBest(st, 3, 18);
+      const wait = Math.max(0, 500 - (performance.now() - t0));
+      setTimeout(() => {
+        if (my !== epoch) return;
+        aiBusy = false;
+        if (m) doMove(m);
+      }, wait);
+    }, 260);
+  }
+
+  function canMoveNow() {
+    if (over || aiBusy || pendingPromo || !playerColor || st.turn !== playerColor) return false;
+    if (mode === 'online') return !!net.game && net.game.status === 'active' && net.canWrite !== false;
+    return true;
+  }
+
+  function onSquare(s) {
+    if (!canMoveNow()) return;
+    if (selected >= 0) {
+      const cands = selMoves.filter(m => m.to === s);
+      if (cands.length > 1) { openPromo(cands); return; }
+      if (cands.length === 1) { doMove(cands[0]); return; }
+    }
+    const p = st.board[s];
+    if (p && colorOf(p) === playerColor && s !== selected) {
+      selected = s;
+      selMoves = legal.filter(m => m.from === s);
+    } else {
+      selected = -1; selMoves = [];
+    }
+    paintSquares();
+  }
+
+  function openPromo(cands) {
+    pendingPromo = cands;
+    const row = $('promoRow');
+    row.innerHTML = '';
+    for (const t of 'QRBN') {
+      const m = cands.find(c => c.promo.toUpperCase() === t);
+      const k = playerColor + t;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mc-btn';
+      b.title = `${SPRITES[k].name} (${SPRITES[k].role})`;
+      b.innerHTML = `<img src="${IMG[k]}" alt="${SPRITES[k].name}">`;
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        pendingPromo = null;
+        $('promo').hidden = true;
+        doMove(m);
+      });
+      row.appendChild(b);
+    }
+    $('promo').hidden = false;
+    row.querySelector('button').focus();
+  }
+
+  function resetState() {
+    epoch++;
+    aiBusy = false; over = null; pendingPromo = null;
+    selected = -1; selMoves = [];
+    $('promo').hidden = true;
+    $('gameover').hidden = true;
+  }
+
+  function newGame() {
+    resetState();
+    freshPosition();
+    flipped = playerColor === 'b';
+    renderAll();
+    save();
+    maybeAI();
+  }
+
+  function undo() {
+    if (mode !== 'ai' || !history.length) return;
+    resetState();
+    const popOne = () => { const h = history.pop(); unmake(st, h.m, h.u); };
+    popOne();
+    if (st.turn !== playerColor && history.length) popOne();
+    legal = legalMoves(st);
+    renderAll();
+    save();
+    maybeAI();
+  }
+
+  // ---------- Persistence of the computer game (per-viewer convenience) ----------
+  function aiSnapshot() { return { color: playerColor, flipped, moves: history.map(h => uci(h.m)) }; }
+  function save() {
+    if (mode !== 'ai') return;
+    try { localStorage.setItem('heaven-chess', JSON.stringify(aiSnapshot())); } catch (e) { /* storage unavailable */ }
+  }
+  function load() { try { return JSON.parse(localStorage.getItem('heaven-chess') || 'null'); } catch (e) { return null; } }
+
+  function replay(moves) {
+    for (const u of moves || []) {
+      const m = legal.find(x => uci(x) === u);
+      if (!m || over) break;
+      commit(m);
+    }
+  }
+
+  function restore(data) {
+    playerColor = data.color === 'b' ? 'b' : 'w';
+    resetState();
+    freshPosition();
+    replay(data.moves);
+    flipped = typeof data.flipped === 'boolean' ? data.flipped : playerColor === 'b';
+    renderAll();
+    if (over) showGameOver(false); else maybeAI();
+  }
+
+  // ---------- Online: two players connected directly (PeerJS) ----------
+  // Each registered player listens on the peer id "heavenchess-<their ID>", so friends can reach them by ID
+  // while the site is open. Profile, friends and the unfinished game live in this browser's storage.
+  const PEER_PREFIX = 'heavenchess-';
+  const PEER_OPTS = { debug: 0, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] } };
+  const net = {
+    peer: null, me: null, status: 'loading', error: '', notice: '',
+    players: new Map(), friends: [], conn: null, oppOnline: false,
+    gameId: null, game: null, overKey: '', inviteColor: 'random', editing: false,
+    incoming: null, outgoing: null, awaitStart: null, dialing: null, pendingJoin: null, retryTimer: null, retries: 0
+  };
+  const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const genCode = () => Array.from({ length: 6 }, () => CODE_ABC[Math.floor(Math.random() * CODE_ABC.length)]).join('');
+  const genGameId = () => Array.from({ length: 12 }, () => 'abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(Math.random() * 32)]).join('');
+  const lsGet = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } };
+  const inviteLink = code => location.origin + location.pathname + '#join-' + code;
+  const cleanCode = c => String(c || '').trim().toUpperCase().replace(/^#/, '');
+  const validCode = c => /^[A-Z2-9]{6}$/.test(c);
+  const profile = () => net.players.get(net.me) || null;
+  const meInfo = () => ({ code: net.me, nick: profile() ? profile().nick : 'Игрок' });
+  const opponentId = () => {
+    const g = net.game;
+    if (!g || !net.me) return null;
+    return g.white === net.me ? g.black : g.black === net.me ? g.white : null;
+  };
+  const overKeyNow = () => over ? `${net.gameId}:${history.length}:${over.type}` : '';
+
+  function readHash() {
+    const m = (location.hash || '').match(/^#join-([A-Za-z0-9]{6})$/);
+    return m ? m[1].toUpperCase() : null;
+  }
+  function clearHash() {
+    try { window.history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
+  }
+
+  function initNet() {
+    net.friends = lsGet('heaven-chess-friends') || [];
+    for (const f of net.friends) if (f && validCode(f.code)) net.players.set(f.code, { code: f.code, nick: String(f.nick || 'Игрок') });
+    const PeerCtor = window.Peer || (window.peerjs && window.peerjs.Peer);
+    if (!PeerCtor) { net.status = 'unavailable'; renderOnline(); return; }
+    const prof = lsGet('heaven-chess-profile');
+    if (prof && validCode(prof.code) && prof.nick) {
+      net.me = prof.code;
+      net.players.set(prof.code, { code: prof.code, nick: String(prof.nick) });
+      connectPeer();
+    } else { net.status = 'register'; renderOnline(); }
+  }
+
+  function connectPeer() {
+    const PeerCtor = window.Peer || (window.peerjs && window.peerjs.Peer);
+    net.status = 'connecting';
+    renderOnline();
+    const peer = new PeerCtor(PEER_PREFIX + net.me.toLowerCase(), PEER_OPTS);
+    net.peer = peer;
+    peer.on('open', () => {
+      net.status = 'ready'; net.error = '';
+      renderOnline();
+      if (net.pendingJoin) { const c = net.pendingJoin; net.pendingJoin = null; clearHash(); joinByLink(c); }
+    });
+    peer.on('connection', conn => setupConn(conn));
+    peer.on('disconnected', () => {
+      if (peer.destroyed) return;
+      net.error = 'Связь с сервером соединений прервалась. Переподключаемся…';
+      renderOnline();
+      setTimeout(() => { try { if (!peer.destroyed && peer.disconnected) peer.reconnect(); } catch (e) { /* retry later */ } }, 3000);
+    });
+    peer.on('error', err => {
+      const type = err && err.type;
+      if (type === 'unavailable-id') { net.status = 'taken'; renderOnline(); return; }
+      if (type === 'peer-unavailable') {
+        const d = net.dialing;
+        if (d && d.purpose !== 'resume') {
+          net.outgoing = null; net.awaitStart = null; net.notice = '';
+          net.error = d.purpose === 'join'
+            ? 'Хозяин этой ссылки сейчас не в сети. Попросите его открыть сайт и попробуйте снова.'
+            : `Игрок #${d.code} сейчас не в сети. Он должен открыть сайт.`;
+        }
+        renderOnline();
+        return;
+      }
+      if (type === 'network' || type === 'server-error' || type === 'socket-error' || type === 'socket-closed') {
+        net.error = 'Нет связи с сервером соединений. Проверьте интернет.';
+      } else {
+        net.error = 'Ошибка соединения. Обновите страницу и попробуйте снова.';
+      }
+      renderOnline();
+    });
+  }
+
+  function setupConn(conn) {
+    conn.on('data', d => onData(conn, d));
+    conn.on('close', () => onConnClose(conn));
+    conn.on('error', () => onConnClose(conn));
+  }
+  function send(conn, msg) { try { if (conn && conn.open) conn.send(msg); } catch (e) { /* connection lost */ } }
+  function dial(code, makeMsg, purpose) {
+    if (!net.peer || net.peer.destroyed || net.peer.disconnected) return null;
+    net.dialing = { code, purpose };
+    const conn = net.peer.connect(PEER_PREFIX + code.toLowerCase(), { reliable: true });
+    setupConn(conn);
+    conn.on('open', () => send(conn, makeMsg()));
+    return conn;
+  }
+
+  function addFriend(p) {
+    if (!p || !validCode(p.code) || p.code === net.me) return;
+    net.friends = [{ code: p.code, nick: p.nick, at: Date.now() }, ...net.friends.filter(f => f.code !== p.code)].slice(0, 20);
+    lsSet('heaven-chess-friends', net.friends);
+  }
+
+  const busy = () => !!(net.game && net.game.status === 'active');
+
+  function onData(conn, d) {
+    if (!d || typeof d !== 'object' || typeof d.t !== 'string') return;
+    const from = d.from && typeof d.from.code === 'string'
+      ? { code: cleanCode(d.from.code).slice(0, 6), nick: String(d.from.nick || 'Игрок').replace(/\s+/g, ' ').trim().slice(0, 16) || 'Игрок' }
+      : null;
+    if (!from || !validCode(from.code) || from.code === net.me) return;
+    net.players.set(from.code, from);
+    const known = net.friends.find(f => f.code === from.code);
+    if (known && known.nick !== from.nick) addFriend(from);
+
+    if (d.t === 'join') {
+      if (busy()) { send(conn, { t: 'busy', from: meInfo() }); return; }
+      hostGame(conn, from, net.inviteColor);
+    } else if (d.t === 'invite') {
+      if (busy()) { send(conn, { t: 'busy', from: meInfo() }); return; }
+      net.incoming = { conn, from };
+      Sound.play('notify');
+      showToast();
+      renderOnline();
+    } else if (d.t === 'accept') {
+      if (net.outgoing && net.outgoing.code === from.code) {
+        const c = net.outgoing.color;
+        net.outgoing = null;
+        hostGame(conn, from, c);
+      }
+    } else if (d.t === 'decline') {
+      if (net.outgoing && net.outgoing.code === from.code) {
+        net.outgoing = null; net.notice = '';
+        net.error = `${from.nick} отказался от партии.`;
+        renderOnline();
+      }
+    } else if (d.t === 'busy') {
+      net.outgoing = null; net.awaitStart = null; net.notice = '';
+      net.error = `${from.nick} сейчас играет другую партию.`;
+      renderOnline();
+    } else if (d.t === 'start') {
+      if (net.awaitStart !== from.code) return;
+      const seated = (d.white === net.me && d.black === from.code) || (d.black === net.me && d.white === from.code);
+      if (!seated || typeof d.gameId !== 'string') return;
+      beginGame(conn, { gameId: d.gameId.slice(0, 24), white: d.white, black: d.black, status: 'active', result: null, moves: [] }, true);
+    } else if (d.t === 'state') {
+      onState(conn, from, d);
+    } else if (d.t === 'gone') {
+      if (d.gameId === net.gameId) { net.error = 'Соперник не нашёл у себя эту партию.'; renderOnline(); }
+    }
+  }
+
+  function hostGame(conn, from, colorPref) {
+    const myColor = colorPref === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : colorPref;
+    const g = {
+      gameId: genGameId(),
+      white: myColor === 'w' ? net.me : from.code,
+      black: myColor === 'b' ? net.me : from.code,
+      status: 'active', result: null, moves: []
+    };
+    send(conn, { t: 'start', from: meInfo(), gameId: g.gameId, white: g.white, black: g.black });
+    beginGame(conn, g, true);
+  }
+
+  function beginGame(conn, g, fresh) {
+    if (mode !== 'online') enterOnline();
+    hideToast();
+    clearRetry();
+    net.conn = conn || null;
+    net.oppOnline = !!(conn && conn.open);
+    net.incoming = null; net.outgoing = null; net.awaitStart = null; net.error = ''; net.notice = '';
+    resetState();
+    freshPosition();
+    net.gameId = g.gameId;
+    net.game = { white: g.white, black: g.black, status: g.status === 'over' ? 'over' : 'active', result: g.result || null };
+    net.overKey = '';
+    playerColor = g.white === net.me ? 'w' : 'b';
+    flipped = playerColor === 'b';
+    if (g.opp && validCode(g.opp.code) && !net.players.has(g.opp.code)) net.players.set(g.opp.code, { code: g.opp.code, nick: String(g.opp.nick || 'Игрок') });
+    replay(g.moves);
+    if (g.result && g.result.type === 'resign') over = { type: 'resign', winner: g.result.winner === 'b' ? 'b' : 'w' };
+    if (over) { net.game.status = 'over'; net.game.result = { type: over.type, winner: over.winner || null }; }
+    addFriend(net.players.get(opponentId()));
+    saveNetGame();
+    renderAll();
+    renderOnline();
+    if (fresh) Sound.play('notify');
+    if (over) { net.overKey = overKeyNow(); showGameOver(false); }
+  }
+
+  function saveNetGame() {
+    if (!net.game) return;
+    const o = opponentId();
+    lsSet('heaven-chess-netgame', {
+      gameId: net.gameId, white: net.game.white, black: net.game.black,
+      status: net.game.status, result: net.game.result,
+      moves: history.map(h => uci(h.m)),
+      opp: net.players.get(o) || { code: o, nick: 'Игрок' }
+    });
+  }
+
+  // Brings the local record in line with the opponent's. Returns true when ours is ahead.
+  function syncMoves(remote) {
+    const local = history.map(h => uci(h.m));
+    const n = Math.min(local.length, remote.length);
+    let same = true;
+    for (let i = 0; i < n; i++) if (local[i] !== remote[i]) { same = false; break; }
+    if (same && remote.length > local.length) {
+      const fresh = remote.slice(local.length);
+      if (fresh.length === 1) {
+        const m = legal.find(x => uci(x) === fresh[0]);
+        if (m && !over) { commit(m); selected = -1; selMoves = []; animateMove(m); }
+      } else {
+        replay(fresh);
+        selected = -1; selMoves = [];
+        renderPieces();
+      }
+      return false;
+    }
+    if (same) return local.length > remote.length;
+    if (remote.length >= local.length) {
+      resetState(); freshPosition(); replay(remote); renderPieces();
+      return false;
+    }
+    return true;
+  }
+
+  function onState(conn, from, d) {
+    if (d.gameId !== net.gameId) {
+      const saved = lsGet('heaven-chess-netgame');
+      const mine = saved && saved.gameId === d.gameId && (saved.white === from.code || saved.black === from.code);
+      if (!mine) { send(conn, { t: 'gone', from: meInfo(), gameId: d.gameId }); return; }
+      if (busy()) { send(conn, { t: 'busy', from: meInfo() }); return; }
+      beginGame(conn, saved, false);
+    }
+    if (opponentId() !== from.code) return;
+    const wasOffline = !net.oppOnline;
+    net.conn = conn; net.oppOnline = true;
+    clearRetry();
+    if (wasOffline) { net.error = ''; net.notice = 'Соперник на связи.'; }
+    const remote = Array.isArray(d.moves) ? d.moves.slice(0, 600).map(String) : [];
+    const ahead = syncMoves(remote);
+    if (d.result && d.result.type === 'resign' && !over) over = { type: 'resign', winner: d.result.winner === 'b' ? 'b' : 'w' };
+    if (over) { net.game.status = 'over'; net.game.result = { type: over.type, winner: over.winner || null }; }
+    saveNetGame();
+    paintSquares(); renderSide(); renderOnline();
+    if (ahead || d.ask) sendState();
+    const key = overKeyNow();
+    if (over && key !== net.overKey) { net.overKey = key; setTimeout(() => showGameOver(true), 500); }
+  }
+
+  function sendState(ask) {
+    if (!net.conn || !net.game) return;
+    send(net.conn, { t: 'state', from: meInfo(), gameId: net.gameId, moves: history.map(h => uci(h.m)), result: net.game.result || null, ask: !!ask });
+  }
+
+  function pushOnline() {
+    if (!net.game) return;
+    if (over) { net.game.status = 'over'; net.game.result = { type: over.type, winner: over.winner || null }; net.overKey = overKeyNow(); }
+    saveNetGame();
+    sendState();
+    if (!net.oppOnline && net.game.status === 'active') startRetry();
+    renderOnline();
+  }
+
+  function resign() {
+    if (!net.game || net.game.status !== 'active' || !playerColor) return;
+    over = { type: 'resign', winner: opp(playerColor) };
+    net.game.status = 'over';
+    net.game.result = { type: 'resign', winner: over.winner };
+    net.overKey = overKeyNow();
+    saveNetGame();
+    sendState();
+    renderSide(); renderOnline(); paintSquares();
+    showGameOver(true);
+  }
+
+  function onConnClose(conn) {
+    if (net.incoming && net.incoming.conn === conn) { net.incoming = null; hideToast(); renderOnline(); }
+    if (conn !== net.conn) return;
+    net.conn = null; net.oppOnline = false;
+    if (net.game && net.game.status === 'active') { net.notice = ''; startRetry(); }
+    renderOnline(); renderSide();
+  }
+
+  function reconnect() {
+    const o = opponentId();
+    if (!o || net.oppOnline) return;
+    dial(o, () => ({ t: 'state', from: meInfo(), gameId: net.gameId, moves: history.map(h => uci(h.m)), result: net.game ? net.game.result : null, ask: true }), 'resume');
+  }
+  function startRetry() {
+    if (net.retryTimer || !net.game) return;
+    net.retries = 0;
+    net.retryTimer = setInterval(() => {
+      if (net.oppOnline || !net.game || net.game.status !== 'active' || net.retries++ > 24) { clearRetry(); renderOnline(); return; }
+      reconnect();
+    }, 5000);
+    reconnect();
+  }
+  function clearRetry() {
+    if (net.retryTimer) { clearInterval(net.retryTimer); net.retryTimer = null; }
+  }
+
+  function register(nick) {
+    nick = nick.replace(/\s+/g, ' ').trim().slice(0, 16);
+    if (nick.length < 2) { net.error = 'Ник должен быть от 2 до 16 символов.'; renderOnline(); return; }
+    const prev = profile();
+    const prof = { code: prev ? prev.code : genCode(), nick };
+    lsSet('heaven-chess-profile', prof);
+    net.me = prof.code;
+    net.players.set(prof.code, prof);
+    net.editing = false; net.error = '';
+    net.notice = prev ? 'Ник обновлён.' : 'Добро пожаловать в рай! Сверху ваш ID: по нему друзья смогут позвать вас снова.';
+    if (!prev) connectPeer(); else renderOnline();
+  }
+
+  function joinByLink(code) {
+    code = cleanCode(code);
+    if (!validCode(code)) return;
+    if (mode !== 'online') enterOnline();
+    if (code === net.me) { net.error = 'Это ваша собственная ссылка. Отправьте её другу.'; renderOnline(); return; }
+    net.error = ''; net.notice = `Соединяемся с игроком #${code}…`;
+    net.awaitStart = code; net.outgoing = null;
+    dial(code, () => ({ t: 'join', from: meInfo() }), 'join');
+    renderOnline();
+  }
+
+  function inviteByCode(code, color) {
+    code = cleanCode(code);
+    if (!validCode(code)) { net.error = 'ID состоит из 6 букв и цифр, например #ABC234.'; renderOnline(); return; }
+    if (code === net.me) { net.error = 'Это ваш собственный ID.'; renderOnline(); return; }
+    net.outgoing = { code, color: color || net.inviteColor };
+    net.error = ''; net.notice = `Приглашение отправлено игроку #${code}. Ждём ответа…`;
+    dial(code, () => ({ t: 'invite', from: meInfo() }), 'invite');
+    renderOnline();
+  }
+
+  function rematch() {
+    const o = opponentId();
+    if (!o || !playerColor) return;
+    $('gameover').hidden = true;
+    const color = opp(playerColor);
+    if (net.conn && net.conn.open) {
+      net.outgoing = { code: o, color };
+      net.error = ''; net.notice = 'Предложение реванша отправлено. Ждём ответа…';
+      send(net.conn, { t: 'invite', from: meInfo() });
+      renderOnline();
+    } else inviteByCode(o, color);
+  }
+
+  function acceptIncoming() {
+    const inc = net.incoming;
+    if (!inc) return;
+    net.awaitStart = inc.from.code;
+    send(inc.conn, { t: 'accept', from: meInfo() });
+    net.incoming = null; net.error = ''; net.notice = 'Соединяемся…';
+    hideToast();
+    if (mode !== 'online') enterOnline();
+    renderOnline();
+  }
+  function declineIncoming() {
+    const inc = net.incoming;
+    if (!inc) return;
+    send(inc.conn, { t: 'decline', from: meInfo() });
+    net.incoming = null;
+    hideToast();
+    renderOnline();
+  }
+
+  function continueSaved() {
+    const saved = lsGet('heaven-chess-netgame');
+    if (!saved || !saved.gameId) return;
+    beginGame(null, saved, false);
+    if (net.game.status === 'active') { net.notice = 'Ищем соперника в сети…'; startRetry(); renderOnline(); }
+  }
+
+  function leaveGame() {
+    clearRetry();
+    net.conn = null; net.oppOnline = false;
+    net.gameId = null; net.game = null; net.error = ''; net.notice = '';
+    resetState(); freshPosition(); playerColor = null; flipped = false;
+    renderAll(); renderOnline();
+  }
+
+  function enterOnline() {
+    save();
+    mode = 'online';
+    resetState(); freshPosition(); playerColor = null; flipped = false;
+    renderAll(); renderOnline();
+  }
+
+  function switchMode(m) {
+    if (m === mode) return;
+    if (m === 'online') { enterOnline(); return; }
+    clearRetry();
+    net.conn = null; net.oppOnline = false; net.gameId = null; net.game = null;
+    mode = 'ai';
+    const s = load();
+    playerColor = 'w';
+    if (s && Array.isArray(s.moves)) restore(s); else newGame();
+  }
+
+  function showToast() {
+    const inc = net.incoming;
+    if (!inc) return;
+    $('toastText').textContent = `${inc.from.nick} (#${inc.from.code}) зовёт вас сыграть`;
+    $('toast').hidden = false;
+  }
+  function hideToast() { $('toast').hidden = true; }
+
+  // Copy inside the click handler; fall back to selecting the text.
+  function copyText(text, inputId) {
+    const done = ok => {
+      net.notice = ok ? 'Скопировано!' : 'Выделено: нажмите Ctrl+C, чтобы скопировать.';
+      renderOnline();
+      if (!ok && inputId) { const el = $(inputId); if (el) { el.focus(); el.select(); } }
+    };
+    try { navigator.clipboard.writeText(text).then(() => done(true), () => done(false)); } catch (e) { done(false); }
+  }
+
+  function lobbyHTML() {
+    const me = profile();
+    const saved = lsGet('heaven-chess-netgame');
+    const colorBtn = (c, label) => `<button class="mc-btn small" type="button" data-act="color" data-c="${c}" aria-pressed="${net.inviteColor === c}">${label}</button>`;
+    let h = `<div class="me-row"><img src="${IMG.wK}" alt=""><span class="who"><b>${esc(me.nick)}</b><span class="pid">ID #${esc(me.code)}</span></span>` +
+      `<button class="mc-btn small" type="button" data-act="copyid">Копировать ID</button></div>`;
+    if (net.editing) {
+      h += `<div class="field"><label for="nickInput">Новый ник</label><div class="input-row"><input class="mc-input" id="nickInput" maxlength="16" value="${esc(me.nick)}" autocomplete="off">` +
+        `<button class="mc-btn small primary" type="button" data-act="register">Сохранить</button></div></div>`;
+    } else {
+      h += `<button class="mc-btn small" type="button" data-act="edit" style="align-self:flex-start">Изменить ник</button>`;
+    }
+    if (net.incoming) {
+      const f = net.incoming.from;
+      h += `<div class="sep"></div><div class="label">Вас зовут сыграть</div><ul class="list"><li class="item"><span class="txt"><b>${esc(f.nick)}</b><small>#${esc(f.code)}</small></span>` +
+        `<button class="mc-btn small primary" type="button" data-act="accept">Принять</button><button class="mc-btn small" type="button" data-act="decline">Нет</button></li></ul>`;
+    }
+    h += `<div class="sep"></div><div class="label">Ваша ссылка-приглашение</div>` +
+      `<p class="note">Отправьте её кому угодно. Пока у вас открыт этот сайт, человек по ссылке сразу попадёт в партию.</p>` +
+      `<div class="input-row"><input class="mc-input" id="linkInput" readonly value="${esc(inviteLink(me.code))}">` +
+      `<button class="mc-btn small primary" type="button" data-act="copylink">Копировать</button></div>` +
+      `<div class="label">Вы играете</div><div class="seg three">${colorBtn('w', 'Белыми')}${colorBtn('b', 'Чёрными')}${colorBtn('random', 'Случайно')}</div>` +
+      `<div class="field"><label for="codeInput">Позвать игрока по ID</label><div class="input-row">` +
+      `<input class="mc-input code" id="codeInput" maxlength="7" placeholder="#ABC234" autocomplete="off">` +
+      `<button class="mc-btn small" type="button" data-act="invite">Позвать</button></div></div>`;
+    if (saved && saved.status === 'active' && saved.opp) {
+      h += `<div class="sep"></div><div class="label">Незаконченная партия</div><ul class="list"><li class="item">` +
+        `<span class="txt"><b>${esc(saved.opp.nick || 'Игрок')}</b><small>ходов: ${(saved.moves || []).length}</small></span>` +
+        `<button class="mc-btn small primary" type="button" data-act="continue">Продолжить</button></li></ul>`;
+    }
+    if (net.friends.length) {
+      h += `<div class="sep"></div><div class="label">С кем вы играли</div><ul class="list">` +
+        net.friends.slice(0, 10).map(f => `<li class="item"><span class="txt"><b>${esc(f.nick)}</b><small>ID #${esc(f.code)}</small></span>` +
+          `<button class="mc-btn small" type="button" data-act="friend" data-code="${esc(f.code)}">Позвать снова</button></li>`).join('') + '</ul>' +
+        `<p class="note">Друг получит приглашение, если у него сейчас открыт сайт.</p>`;
+    }
+    return h;
+  }
+
+  function inGameHTML() {
+    const g = net.game, o = opponentId(), pl = net.players.get(o);
+    let h = `<div class="label">${g.status === 'over' ? 'Партия окончена' : 'Идёт партия'}</div>` +
+      `<div class="item"><span class="txt"><b>${pl ? esc(pl.nick) : 'Соперник'}</b><small>${o ? 'ID #' + esc(o) : ''}</small></span>` +
+      (net.oppOnline ? '<span class="badge go">в сети</span>' : '<span class="badge wait">не в сети</span>') + '</div>';
+    if (!net.oppOnline && g.status === 'active') {
+      h += `<p class="note">${net.retryTimer ? '<span class="dots">Соперник отключился. Ждём его</span>' : 'Соперника нет на связи.'} Ходы сохранятся и дойдут, когда он вернётся.</p>` +
+        (net.retryTimer ? '' : `<button class="mc-btn small" type="button" data-act="reconnect" style="align-self:flex-start">Переподключиться</button>`);
+    }
+    h += '<div class="btn-grid">';
+    if (playerColor && g.status === 'active') h += `<button class="mc-btn" type="button" data-act="resign">Сдаться</button>`;
+    if (playerColor && g.status === 'over' && o) h += `<button class="mc-btn primary" type="button" data-act="rematch">Реванш</button>`;
+    h += `<button class="mc-btn" type="button" data-act="flip">Перевернуть</button>`;
+    h += `<button class="mc-btn wide" type="button" data-act="lobby">В лобби</button></div>`;
+    return h;
+  }
+
+  function renderOnline() {
+    const box = $('online');
+    if (!box) return;
+    const keep = {};
+    box.querySelectorAll('input').forEach(i => { if (!i.readOnly) keep[i.id] = i.value; });
+    const focusId = document.activeElement && box.contains(document.activeElement) ? document.activeElement.id : null;
+
+    let h = '';
+    if (net.status === 'loading' || net.status === 'connecting') h = '<p class="note"><span class="dots">Подключаемся к облакам</span></p>';
+    else if (net.status === 'unavailable') {
+      h = '<div class="label">Игра вдвоём</div><p class="note">Не удалось загрузить модуль связи. Проверьте интернет и обновите страницу. Игра с компьютером работает и без него.</p>';
+    } else if (net.status === 'taken') {
+      h = '<div class="label">Уже открыто</div><p class="note">Сайт с вашим профилем уже открыт в другой вкладке. Закройте ту вкладку и обновите эту.</p>';
+    } else if (net.status === 'register') {
+      h = `<div class="label">Регистрация</div>` +
+        (net.pendingJoin ? '<p class="note ok">Вас пригласили на партию! Введите ник, чтобы сесть за доску.</p>' : '<p class="note">Придумайте ник. Вы получите свой ID, по которому друзья смогут звать вас снова.</p>') +
+        `<div class="field"><label for="nickInput">Ник</label><div class="input-row"><input class="mc-input" id="nickInput" maxlength="16" placeholder="Например, Облачко" autocomplete="off">` +
+        `<button class="mc-btn primary" type="button" data-act="register">Войти</button></div></div>`;
+    } else if (net.game) h = inGameHTML();
+    else h = lobbyHTML();
+    if (net.error) h += `<p class="note err">${esc(net.error)}</p>`;
+    if (net.notice) h += `<p class="note ok">${esc(net.notice)}</p>`;
+    box.innerHTML = h;
+
+    for (const id in keep) { const el = $(id); if (el && !el.readOnly && keep[id]) el.value = keep[id]; }
+    if (focusId && $(focusId)) $(focusId).focus();
+  }
+
+  function onOnlineClick(e) {
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    Sound.unlock();
+    const act = b.dataset.act;
+    net.notice = '';
+    if (act === 'register') register(($('nickInput') || {}).value || '');
+    else if (act === 'edit') { net.editing = true; renderOnline(); const i = $('nickInput'); if (i) i.focus(); }
+    else if (act === 'copyid') { const me = profile(); if (me) copyText('#' + me.code); }
+    else if (act === 'copylink') { const me = profile(); if (me) copyText(inviteLink(me.code), 'linkInput'); }
+    else if (act === 'color') { net.inviteColor = b.dataset.c; renderOnline(); }
+    else if (act === 'invite') inviteByCode(($('codeInput') || {}).value || '');
+    else if (act === 'friend') inviteByCode(b.dataset.code);
+    else if (act === 'accept') acceptIncoming();
+    else if (act === 'decline') declineIncoming();
+    else if (act === 'continue') continueSaved();
+    else if (act === 'reconnect') startRetry();
+    else if (act === 'resign') resign();
+    else if (act === 'rematch') rematch();
+    else if (act === 'flip') { flipped = !flipped; renderAll(); }
+    else if (act === 'lobby') leaveGame();
+  }
+
+  // ---------- Wiring ----------
+  function buildBestiary() {
+    const row = k => `<button class="beast" type="button" data-k="${k}" title="Послушать"><img src="${IMG[k]}" alt=""><span><b>${SPRITES[k].name}</b><small>${SPRITES[k].role}</small></span></button>`;
+    const order = ['K', 'Q', 'R', 'B', 'N', 'P'];
+    $('beasts').innerHTML = `<h3>Небесное войско</h3>${order.map(t => row('w' + t)).join('')}` +
+      `<h3>Армия Края</h3>${order.map(t => row('b' + t)).join('')}`;
+    $('beasts').addEventListener('click', e => { const b = e.target.closest('.beast'); if (b) Sound.play(b.dataset.k); });
+  }
+
+  function paintSoundBtn() {
+    const btn = $('btnSound');
+    btn.setAttribute('aria-pressed', String(!Sound.muted));
+    btn.title = Sound.muted ? 'Включить звук' : 'Выключить звук';
+    btn.querySelector('.waves').style.display = Sound.muted ? 'none' : '';
+    btn.querySelector('.mute').style.display = Sound.muted ? '' : 'none';
+  }
+
+  function hotSnapshot() {
+    return mode === 'online' ? { mode, gameId: net.gameId } : Object.assign({ mode }, aiSnapshot());
+  }
+
+  function start(data) {
+    buildArt();
+    buildSky();
+    buildBoard();
+    buildBestiary();
+    paintSoundBtn();
+    $('sideWImg').src = IMG.wK;
+    $('sideBImg').src = IMG.bK;
+    $('btnNew').addEventListener('click', newGame);
+    $('btnUndo').addEventListener('click', undo);
+    $('btnFlip').addEventListener('click', () => { flipped = !flipped; renderAll(); save(); });
+    $('sideW').addEventListener('click', () => { if (playerColor !== 'w') { playerColor = 'w'; newGame(); } });
+    $('sideB').addEventListener('click', () => { if (playerColor !== 'b') { playerColor = 'b'; newGame(); } });
+    $('modeAI').addEventListener('click', () => switchMode('ai'));
+    $('modeOnline').addEventListener('click', () => switchMode('online'));
+    $('btnSound').addEventListener('click', () => { Sound.toggle(); paintSoundBtn(); Sound.play('wP'); });
+    $('online').addEventListener('click', onOnlineClick);
+    $('online').addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      if (e.target.id === 'nickInput') register(e.target.value);
+      if (e.target.id === 'codeInput') inviteByCode(e.target.value);
+    });
+    $('goAgain').addEventListener('click', () => {
+      if (mode === 'ai') newGame();
+      else rematch();
+    });
+    $('goClose').addEventListener('click', () => { $('gameover').hidden = true; });
+    $('promo').addEventListener('click', e => {
+      if (e.target === $('promo')) { pendingPromo = null; $('promo').hidden = true; }
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && pendingPromo) { pendingPromo = null; $('promo').hidden = true; }
+    });
+    window.addEventListener('hashchange', () => {
+      const id = readHash();
+      if (!id) return;
+      if (net.status === 'ready') { clearHash(); joinByLink(id); }
+      else { net.pendingJoin = id; switchMode('online'); }
+    });
+    $('toast').addEventListener('click', e => {
+      const b = e.target.closest('[data-t]');
+      if (!b) return;
+      Sound.unlock();
+      if (b.dataset.t === 'accept') acceptIncoming(); else declineIncoming();
+    });
+
+    const invited = readHash();
+    if (invited) {
+      net.pendingJoin = invited;
+      mode = 'online';
+      playerColor = null;
+      freshPosition();
+      renderAll();
+      renderOnline();
+    } else {
+      const saved = (data && Array.isArray(data.moves)) ? data : load();
+      if (saved && Array.isArray(saved.moves)) restore(saved); else newGame();
+    }
+    initNet();
+  }
+
+  window.claude?.hot?.snapshot?.(hotSnapshot);
+  window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
